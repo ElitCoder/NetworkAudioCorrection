@@ -1,0 +1,10 @@
+Build essentials:
+./install.sh
+
+FIRST USE (Server & Client):
+1. Install build essentials using the command above
+2. Compile using ./create.sh
+3. Start Server by cd Server/ && ./Server and start client by cd Client/ && ./Client
+
+Configuration:
+Server has a config file at Server/config
