@@ -68,7 +68,7 @@ bool System::checkConnection(const vector<string>& ips) {
 	return true;
 }
 
-SSHOutput System::runScript(const vector<string>& ips, const vector<string>& scripts) {
+void System::runScript(const vector<string>& ips, const vector<string>& scripts) {
 	// Make sure all speakers are connected
 	checkConnection(ips);
 	
@@ -79,18 +79,20 @@ SSHOutput System::runScript(const vector<string>& ips, const vector<string>& scr
 	}
 	*/
 	
-	cout << "Running SSH commands... " << flush;
+	//cout << "Running SSH commands... " << flush;
 	
 	ssh_.setSetting(SETTING_ENABLE_SSH_OUTPUT_VECTOR_STYLE, true);
 	auto outputs = ssh_.command(ips, scripts);
 	ssh_.setSetting(SETTING_ENABLE_SSH_OUTPUT_VECTOR_STYLE, false);
 	
+	// TODO: Add option to print outputs here
+	
+	/*
 	if (outputs.empty())
 		cout << "ERROR\n";
 	else
 		cout << "done\n";
-	
-	return outputs;
+	*/
 }
 
 vector<Speaker*> System::getSpeakers(const vector<string>& ips) {
@@ -149,9 +151,9 @@ Speaker& System::getSpeaker(const string& ip) {
 bool System::sendFile(const vector<string>& ips, const string& from, const string& to) {
 	checkConnection(ips);
 	
-	cout << "Sending file " << from << " -> " << to << "... " << flush;
+	//cout << "Sending file " << from << " -> " << to << "... " << flush;
 	auto status = ssh_.transferRemote(ips, vector<string>(ips.size(), from), vector<string>(ips.size(), to));
-	cout << (status ? "done\n" : "ERROR\n");
+	//cout << (status ? "done\n" : "ERROR\n");
 	
 	return status;
 }
@@ -165,9 +167,9 @@ bool System::getFile(const vector<string>& ips, const vector<string>& from, cons
 	}
 	*/
 	
-	cout << "Retrieving files from SSH... " << flush;
+	//cout << "Retrieving files from SSH... " << flush;
 	auto status = ssh_.transferLocal(ips, from, to, true);
-	cout << (status ? "done\n" : "ERROR\n") << flush;
+	//cout << (status ? "done\n" : "ERROR\n") << flush;
 	
 	return status;
 }

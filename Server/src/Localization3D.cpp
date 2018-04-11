@@ -1,5 +1,5 @@
 #include "Localization3D.h"
-#include "Config.h"
+#include "Base.h"
 
 #include <cmath>
 #include <iostream>
@@ -271,8 +271,8 @@ double diffZ(const vector<Point>& points) {
 }
 
 vector<array<double, 3>> Localization3D::run(const Localization3DInput& input, bool fast_calcuation) {
-	g_degree_accuracy = Config::get<int>("degree_accuracy");
-	g_point_accuracy = Config::get<double>("point_accuracy");
+	g_degree_accuracy = Base::config().get<int>("degree_accuracy");
+	g_point_accuracy = Base::config().get<double>("point_accuracy");
 	PI = atan(1) * 4;
 	
 	vector<Point> points;
@@ -304,17 +304,17 @@ vector<array<double, 3>> Localization3D::run(const Localization3DInput& input, b
 	
 	//cout << "Debug: running localization\n";
 	
-	g_stopping = chrono::system_clock::now() + chrono::seconds(Config::get<int>("timeout"));
+	g_stopping = chrono::system_clock::now() + chrono::seconds(Base::config().get<int>("timeout"));
 	g_fast_calculation = fast_calcuation;
 	
-	g_use_2d = Config::get<bool>("use_2d");
+	g_use_2d = Base::config().get<bool>("use_2d");
 	
 	bool stop = false;
 	
 	while (g_degree_accuracy > 0) {
 		cout << "Debug: trying degree " << g_degree_accuracy << endl;
 		
-		g_point_accuracy = Config::get<double>("point_accuracy");
+		g_point_accuracy = Base::config().get<double>("point_accuracy");
 
 		while (g_point_accuracy > 0) {
 			// Check time limit here

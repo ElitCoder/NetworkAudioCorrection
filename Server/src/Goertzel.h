@@ -10,4 +10,6 @@ namespace Goertzel {
 	Localization3DInput runGoertzel(const std::vector<std::string>& ips);
 }
 
+double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data);
+
 #endif

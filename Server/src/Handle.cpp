@@ -1,9 +1,9 @@
 #include "Handle.h"
 #include "WavReader.h"
-#include "Config.h"
 #include "Localization3D.h"
 #include "Goertzel.h"
 #include "Base.h"
+#include "Packet.h"
 
 #include <iostream>
 #include <cmath>
@@ -12,53 +12,40 @@
 
 using namespace std;
 
+enum {
+	SPEAKER_MIN_VOLUME = 0,				// 0 = -57 dB
+	SPEAKER_MAX_VOLUME = 57,			// 57 = 0 dB
+	SPEAKER_MIN_CAPTURE = 0,			// 0 = -12 dB
+	SPEAKER_MAX_CAPTURE = 63,			// 63 = 35.25 dB
+	SPEAKER_CAPTURE_BOOST_MUTE = 0,		// -inf dB
+	SPEAKER_CAPTURE_BOOST_NORMAL = 1,	// 0 dB
+	SPEAKER_CAPTURE_BOOST_ENABLED = 2	// +20 dB
+};
+
+enum {
+	TYPE_BEST_EQ,
+	TYPE_NEXT_EQ,
+	TYPE_FLAT_EQ
+};
+
+// We're not multithreading anyway
+Connection* g_current_connection = nullptr;
+
 static vector<string> g_frequencies = {	"63",
-									"125",
-									"250",
-									"500",
-									"1000",
-									"2000",
-									"4000",
-									"8000",
-									"16000" };
+										"125",
+										"250",
+										"500",
+										"1000",
+										"2000",
+										"4000",
+										"8000",
+										"16000" };
 
-static double g_target_mean = -50;
+static double g_target_mean = -45;
 
-static int SPEAKER_MAX_VOLUME;
-
-static SSHOutput runBasicScriptExternal(const vector<string>& speakers, const vector<string>& mics, const vector<string>& all_ips, const vector<string>& scripts, const string& send_from, const string& send_to) {
-	if (!Base::system().sendFile(speakers, send_from, send_to))
-		return SSHOutput();
-		
-	auto output = Base::system().runScript(all_ips, scripts);
-	
-	if (output.empty())
-		return output;
-		
-	if (!Base::system().getRecordings(mics))
-		return SSHOutput();
-		
-	return output;
-}
-
-static SSHOutput runBasicScript(const vector<string>& ips, const vector<string>& scripts, const string& send_from, const string& send_to) {
-	return runBasicScriptExternal(ips, ips, ips, scripts, send_from, send_to);
-}
-
-static short getRMS(const vector<short>& data, size_t start, size_t end) {
-	unsigned long long sum = 0;
-	
-	for (size_t i = start; i < end; i++)
-		sum += (data.at(i) * data.at(i));
-		
-	sum /= (end - start);
-	
-	return sqrt(sum);
-}
-
-// The following 2 functions are from SO
-constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-                           '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+// The following function is from SO
+constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
+                           	'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'	};
 
 string getHexString(unsigned char* data, int len) {
 	string s(len * 2, ' ');
@@ -94,101 +81,68 @@ void to_523(double param_dec, unsigned char * param_hex) {
 	param_hex[0] = param_hex[0] ^ 0x08;
 }
 
-static vector<string> createEnableAudioSystem(const vector<string>& ips) {
-	string command = "systemctl start audio_relayd; wait\n";
-	
-	return vector<string>(ips.size(), command);
+static void enableAudioSystem(const vector<string>& ips) {
+	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl start audio_relayd"));
 }
 
-void Handle::resetEverything(const vector<string>& ips) {
-	string command = 	"dspd -s -w; wait; ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; "; 				/* 57 is 0 dB for C1004-e */
-	command +=			"amixer -c1 sset 'Capture' 63; wait; ";
-	command +=			"dspd -s -p flat; wait; ";
-	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait; "; 	/* Sets DSP gain to 0 */
-	command +=			"amixer -c1 sset 'PGA Boost' 2; wait\n";
+static void disableAudioSystem(const vector<string>& ips) {
+	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl stop audio*"));
+}
+
+// It's like we were not here
+void resetEverything(const vector<string>& ips) {
+	string command = 	"dspd -s -w && ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on && "; 				/* 57 is 0 dB for C1004-e */
+	command +=			"amixer -c1 sset 'Capture' 63 && ";
+	command +=			"dspd -s -p flat && ";
+	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00 && "; 	/* Sets DSP gain to 0 */
+	command +=			"amixer -c1 sset 'PGA Boost' 2";
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
 	
-	auto scripts = createEnableAudioSystem(ips);
-	Base::system().runScript(ips, scripts);
+	// Set system speaker settings as well
+	for (auto* speaker : Base::system().getSpeakers(ips)) {
+		speaker->setVolume(SPEAKER_MAX_VOLUME);
+		speaker->clearAllEQs();
+	}
 }
 
-bool Handle::setSpeakerAudioSettings(const vector<string>& ips, const vector<int>& volumes, const vector<int>& captures, const vector<int>& boosts) {
-	vector<string> commands;
+static void setTestSpeakerSettings(const vector<string>& ips) {
+	string command =	"dspd -s -w && dspd -s -m && dspd -s -u limiter && dspd -s -u static && dspd -s -u preset && dspd -s -p flat && ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on && amixer -c1 sset 'Capture' 63 && amixer -c1 sset 'PGA Boost' 2 && ";
+	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00";		/* Sets DSP gain to 0 */
 	
-	// In DSP pre-gain
-	// -12 dB = 002026f3
-	// 0 dB = 00800000
+	Base::system().runScript(ips, vector<string>(ips.size(), command));
 	
-	// Let's say this is max volume
-	if (!volumes.empty())
-		SPEAKER_MAX_VOLUME = volumes.front();
-	
-	for (size_t i = 0; i < volumes.size(); i++) {
-		string volume = to_string(volumes.at(i));
-		string capture = to_string(captures.at(i));
-		string boost = to_string(boosts.at(i));
-		
-		string command = 	"dspd -s -w; wait; ";
-		command +=			"amixer -c1 sset 'Headphone' " + volume + " on; wait; ";
-		command +=			"amixer -c1 sset 'Capture' " + capture + "; wait; ";
-		command +=			"dspd -s -m; wait; dspd -s -u limiter; wait; ";
-		command +=			"dspd -s -u static; wait; ";
-		command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
-		command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait; "; /* Sets DSP gain to 0 */
-		command +=			"amixer -c1 sset 'PGA Boost' " + boost + "; wait\n";
-		
-		commands.push_back(command);
+	// Set system speaker settings as well
+	for (auto* speaker : Base::system().getSpeakers(ips)) {
+		speaker->setVolume(SPEAKER_MAX_VOLUME);
+		speaker->clearAllEQs();
 	}
-	
-	auto status = !Base::system().runScript(ips, commands).empty();
-	
-	if (status) {
-		// This should be used for resetting speakers
-		for (size_t i = 0; i < ips.size(); i++) {
-			auto& speaker = Base::system().getSpeaker(ips.at(i));
-			
-			speaker.setVolume(volumes.at(i));
-			speaker.setMicVolume(captures.at(i));
-			speaker.setMicBoost(boosts.at(i));
-			speaker.clearAllEQs();
-		}	
-	}
-	
-	return status;
 }
 
-static vector<string> createRunLocalizationScripts(const vector<string>& ips, int play_time, int idle_time, int extra_recording, const string& file) {
+static vector<string> createRunLocalizationScripts(const vector<string>& ips, int play_time, int idle_time, const string& file) {
 	vector<string> scripts;
 	
 	for (size_t i = 0; i < ips.size(); i++) {
-		string script =	"systemctl stop audio*\n";
-		script +=		"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d ";
-		script +=		to_string(idle_time * 2 + ips.size() * (1 + play_time) + extra_recording - 1 /* no need for one extra second */);
+		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d ";
+		script +=		to_string(idle_time + ips.size() * (idle_time + play_time));
 		script +=		" /tmp/cap";
 		script +=		ips.at(i);
 		script +=		".wav &\n";
 		script +=		"proc1=$!\n";
 		script +=		"sleep ";
-		script +=		to_string(idle_time + i * (play_time + 1));
+		script +=		to_string(idle_time + i * (play_time + idle_time));
 		script +=		"\n";
 		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/";
 		script += 		file;
 		script +=		"\n";
 		script +=		"wait $proc1\n";
-		script +=		"systemctl start audio_relayd; wait\n";
 		
 		scripts.push_back(script);
 	}
 	
 	return scripts;
-}
-
-void printSSHOutput(SSHOutput outputs) {
-	for (auto& output : outputs)
-		for (auto& line : output.second)
-			cout << "SSH (" << output.first << "): " << line << endl;
 }
 
 static PlacementOutput assemblePlacementOutput(const vector<Speaker*> speakers) {
@@ -205,7 +159,7 @@ static PlacementOutput assemblePlacementOutput(const vector<Speaker*> speakers) 
 	return output;
 }
 
-PlacementOutput Handle::runLocalization(const vector<string>& ips, bool skip_script, bool force_update) {
+PlacementOutput Handle::runLocalization(const vector<string>& ips, bool force_update) {
 	if (ips.empty())
 		return PlacementOutput();
 
@@ -221,16 +175,33 @@ PlacementOutput Handle::runLocalization(const vector<string>& ips, bool skip_scr
 		return assemblePlacementOutput(Base::system().getSpeakers(ips));
 	}
 	
-	if (!skip_script) {
+	if (!Base::config().get<bool>("no_scripts")) {
 		// Create scripts
-		int play_time = Config::get<int>("speaker_play_length");
-		int idle_time = Config::get<int>("idle_time");
-		int extra_recording = Config::get<int>("extra_recording");
+		int play_time = Base::config().get<int>("speaker_play_length");
+		int idle_time = Base::config().get<int>("idle_time");
 		
-		auto scripts = createRunLocalizationScripts(ips, play_time, idle_time, extra_recording, Config::get<string>("goertzel"));
+		auto scripts = createRunLocalizationScripts(ips, play_time, idle_time, Base::config().get<string>("goertzel"));
 		
-		if (runBasicScript(ips, scripts, "data/" + Config::get<string>("goertzel"), "/tmp/").empty())
-			return PlacementOutput();
+		// Disable audio system
+		disableAudioSystem(ips);
+		
+		// Send test files
+		Base::system().sendFile(ips, "data/" + Base::config().get<string>("goertzel"), "/tmp/");
+		
+		// Set test speaker settings
+		setTestSpeakerSettings(ips);
+		
+		// Start localization scripts
+		Base::system().runScript(ips, scripts);
+		
+		// Reset speaker settings
+		resetEverything(ips);
+		
+		// Collect data
+		Base::system().getRecordings(ips);
+		
+		// Enable audio system again
+		enableAudioSystem(ips);
 	}
 	
 	auto distances = Goertzel::runGoertzel(ips);
@@ -238,7 +209,7 @@ PlacementOutput Handle::runLocalization(const vector<string>& ips, bool skip_scr
 	if (distances.empty())
 		return PlacementOutput();
 	
-	auto placement = Localization3D::run(distances, Config::get<bool>("fast"));
+	auto placement = Localization3D::run(distances, Base::config().get<bool>("fast"));
 	
 	// Keep track of which localization this is
 	static int placement_id = -1;
@@ -269,130 +240,23 @@ vector<bool> Handle::checkSpeakersOnline(const vector<string>& ips) {
 	return online;
 }
 
-static vector<string> createSoundImageScripts(const vector<string>& speakers, const vector<string>& mics, int play_time, int idle_time, const string& filename) {
-	vector<string> scripts;
-	
-	for (size_t i = 0; i < speakers.size(); i++) {
-		string script =	"sleep " + to_string(idle_time) + "\n";
-		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename + "\n";
-		
-		scripts.push_back(script);
-	}
-	
-	for (size_t i = 0; i < mics.size(); i++) {
-		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(idle_time * 2 + play_time);
-		script +=		" /tmp/cap";
-		script +=		mics.at(i);
-		script +=		".wav\n";
-		
-		scripts.push_back(script);
-	}
-	
-	return scripts;
-}
-
-static vector<string> createSoundImageIndividualScripts(const vector<string>& speakers, const vector<string>& mics, int play_time, int idle_time, const string& filename) {
-	vector<string> scripts;
-	
-	for (size_t i = 0; i < speakers.size(); i++) {
-		string script =	"sleep " + to_string(idle_time + i * (play_time + 1)) + "\n";
-		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename + "\n";
-		
-		scripts.push_back(script);
-	}
-	
-	for (size_t i = 0; i < mics.size(); i++) {
-		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(idle_time + speakers.size() * (play_time + 1));
-		script +=		" /tmp/cap";
-		script +=		mics.at(i);
-		script +=		".wav\n";
-		
-		scripts.push_back(script);
-	}
-	
-	return scripts;
-}
-
-static vector<string> createDisableAudioSystem(const vector<string>& ips) {
-	string command = "systemctl stop audio*; wait\n";
-	
-	return vector<string>(ips.size(), command);
-}
-
-// Taken from git/SO
-static double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data)
-{
-    int     k,i;
-    float   floatnumSamples;
-    float   omega,sine,cosine,coeff,q0,q1,q2,magnitude,real,imag;
-
-    float   scalingFactor = numSamples / 2.0;
-
-    floatnumSamples = (float) numSamples;
-    k = (int) (0.5 + ((floatnumSamples * TARGET_FREQUENCY) / (float)SAMPLING_RATE));
-    omega = (2.0 * M_PI * k) / floatnumSamples;
-    sine = sin(omega);
-    cosine = cos(omega);
-    coeff = 2.0 * cosine;
-    q0=0;
-    q1=0;
-    q2=0;
-
-    for(i=0; i<numSamples; i++)
-    {
-        q0 = coeff * q1 - q2 + data[i];
-        q2 = q1;
-        q1 = q0;
-    }
-
-    // calculate the real and imaginary results
-    // scaling appropriately
-    real = (q1 - q2 * cosine) / scalingFactor;
-    imag = (q2 * sine) / scalingFactor;
-
-    magnitude = sqrtf(real*real + imag*imag);
-    return magnitude;
-}
-
 static vector<double> getFFT9(const vector<short>& data, size_t start, size_t end) {
 	vector<short> sound(data.begin() + start, data.begin() + end);
 	
-	// Do FFT here - scratch that, let's do 9 Goertzel calculations instead
-	double freq63 = goertzel(sound.size(), 63, 48000, sound.data());
-	double freq125 = goertzel(sound.size(), 125, 48000, sound.data());
-	double freq250 = goertzel(sound.size(), 250, 48000, sound.data());
-	double freq500 = goertzel(sound.size(), 500, 48000, sound.data());
-	double freq1000 = goertzel(sound.size(), 1000, 48000, sound.data());
-	double freq2000 = goertzel(sound.size(), 2000, 48000, sound.data());
-	double freq4000 = goertzel(sound.size(), 4000, 48000, sound.data());
-	double freq8000 = goertzel(sound.size(), 8000, 48000, sound.data());
-	double freq16000 = goertzel(sound.size(), 16000, 48000, sound.data());
+	// Let's do 9 Goertzel calculations to get the center frequencies
+	vector<double> dbs;
 	
-	return { freq63, freq125, freq250, freq500, freq1000, freq2000, freq4000, freq8000, freq16000 };
-} 
-
-template<class T>
-static T getMean(const vector<T>& container) {
-	double sum = 0;
-	
-	for(const auto& element : container)
-		sum += element;
+	for (auto& frequency_string : g_frequencies)
+		dbs.push_back(goertzel(sound.size(), stoi(frequency_string), 48000, sound.data()));
 		
-	return sum / (double)container.size();	
+	return dbs;
 }
 
 static double getSoundImageScore(const vector<double>& dbs) {
-	double mean = g_target_mean;
 	double score = 0;
 	
-	//// Ignore 63, 125, 250 since they are variable due to microphone
-	vector<double> dbs_above_63(dbs.begin(), dbs.end());
-	
-	for (size_t i = 0; i < dbs_above_63.size(); i++) {
-		auto db = dbs_above_63.at(i);
-			
-		score += (mean - db) * (mean - db);
-	}
+	for (auto& db : dbs)
+		score += (g_target_mean - db) * (g_target_mean - db);
 	
 	return 1 / sqrt(score);
 }
@@ -400,33 +264,25 @@ static double getSoundImageScore(const vector<double>& dbs) {
 static vector<double> getSoundImageCorrection(vector<double> dbs) {
 	vector<double> eq;
 	
-	for (auto& db : dbs) {
-		double difference = g_target_mean - db;
-		
-		eq.push_back(trunc(difference));
-	}
+	for (auto& db : dbs)
+		eq.push_back(g_target_mean - db);
 	
 	return eq;
 }
 
-static void setSpeakerVolume(const string& ip, int volume, int base_dsp_level) {
+static void setSpeakerVolume(const string& ip, double volume, int base_dsp_level) {
 	auto& speaker = Base::system().getSpeaker(ip);
 	speaker.setVolume(volume);
-	//speaker.setVolume(speaker.getCurrentVolume() + delta_volume);
 	
-	cout << "Setting speaker volume to " << speaker.getCurrentVolume() << endl;
-	int delta = speaker.getCurrentVolume() - SPEAKER_MAX_VOLUME;
+	cout << "Setting speaker volume to " << speaker.getVolume() << endl;
+	double delta = speaker.getVolume() - SPEAKER_MAX_VOLUME;
 	
-	// current_dsp_level = -18 ?
-	// Gives the speaker 6 dB headroom to boost before DSP limiting on maxed EQ
-	int final_level = base_dsp_level + delta;
+	// -18 gives the speaker 6 dB headroom to boost before DSP limiting on maxed EQ
+	double final_level = base_dsp_level + delta;
 	
 	// Don't boost above limit
 	if (final_level > 0) {
-		cout << "WARNING" << endl;
-		cout << "Trying to boost DSP gain above 0 dB\n";
-		cout << "Is " << final_level << endl;
-		
+		cout << "WARNING: Trying to boost DSP gain above 0 dB, it's " << final_level << endl;
 		final_level = 0;
 	}
 	
@@ -436,14 +292,13 @@ static void setSpeakerVolume(const string& ip, int volume, int base_dsp_level) {
 	string hex_bytes = "";
 	
 	cout << "Setting DSP gain bytes to " << hex_string << endl;
-	cout << "For level " << final_level << endl;
+	cout << "For level " << final_level << " dB\n";
 	
 	for (size_t i = 0; i < hex_string.length(); i += 2) 
 		hex_bytes += "0x" + hex_string.substr(i, 2) + ",";
 		
 	hex_bytes.pop_back();	
 	
-	//string command = "amixer -c1 sset 'Headphone' " + to_string(speaker.getCurrentVolume()) + " on; wait\n";
 	string command =	"amixer -c1 cset numid=170 ";
 	command +=			hex_bytes;
 	command +=			"; wait\n";
@@ -451,106 +306,72 @@ static void setSpeakerVolume(const string& ip, int volume, int base_dsp_level) {
 	Base::system().runScript({ ip }, { command });
 }
 
-static vector<double> setSpeakersBestEQ(const vector<string>& ips, const vector<string>& mics) {
-	auto speakers = Base::system().getSpeakers(ips);
+static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
+	auto speakers = Base::system().getSpeakers(speaker_ips);
 	vector<string> commands;
-	vector<double> scores;
 	
-	int highest_dsp_gain = -10000;
+	// Wanted by best EQ
+	double highest_dsp_gain = INT_MIN;
 	
 	for (auto* speaker : speakers) {
 		if (speaker->getBestVolume() > highest_dsp_gain)
-			highest_dsp_gain = speaker->getBestVolume();		
+			highest_dsp_gain = speaker->getBestVolume();
 	}
 	
 	for (auto* speaker : speakers) {
-		auto correction_eq = speaker->getBestEQ();
-		speaker->setBestVolume();
-		//vector<int> correction_eq = { 9, -10, 0, 0, 0, 0, 0, 0, 0 };
+		vector<double> eq;
 		
-		string command =	"dspd -s -u preset; wait; ";
-		//command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait; ";
-		command +=			"dspd -s -e ";
+		switch (type) {
+			case TYPE_BEST_EQ: {
+				eq = speaker->getBestEQ();
+				speaker->setBestVolume();
+				
+				break;
+			}
+			
+			case TYPE_NEXT_EQ: {
+				eq = speaker->getNextEQ();
+				speaker->setNextVolume();
+				
+				break;
+			}
+			
+			case TYPE_FLAT_EQ: {
+				eq = vector<double>(9, 0);
+				speaker->setVolume(SPEAKER_MAX_VOLUME);
+			}
+		}
 		
-		for (auto setting : correction_eq)
+		string command = "dspd -s -u preset && dspd -s -e ";
+		
+		for (auto setting : eq)
 			command += to_string(setting) + ",";
 			
-		command.pop_back();	
-		command +=			"; wait\n";
-		
+		command.pop_back();
 		commands.push_back(command);
 		
-		cout << "Best score: " << speaker->getBestScore() << endl;
-		scores.push_back(speaker->getBestScore());
+		double dsp_gain;
 		
-		setSpeakerVolume(speaker->getIP(), speaker->getCurrentVolume(), SPEAKER_MAX_VOLUME - highest_dsp_gain);
+		switch (type) {
+			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
+				break;
+				
+			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -18;
+				break;
+		}
+		
+		setSpeakerVolume(speaker->getIP(), speaker->getVolume(), dsp_gain);
 	}
 	
-	Base::system().runScript(ips, commands);
-	
-	// Set mics to normal values
-	Handle::resetEverything(mics);
-	
-	return scores;
-}
-
-static void setCorrectedEQ(const vector<string>& ips) {
-	auto speakers = Base::system().getSpeakers(ips);
-	vector<string> commands;
-	
-	for (auto* speaker : speakers) {
-		auto correction_eq = speaker->getCorrectionEQ();
-		speaker->setCorrectionVolume();
-		
-		string command =	"dspd -s -u preset; wait; ";
-		command +=			"dspd -s -e ";
-		
-		for (auto setting : correction_eq)
-			command += to_string(setting) + ",";
-			
-		command.pop_back();	
-		command +=			"; wait\n";
-		
-		commands.push_back(command);
-		
-		setSpeakerVolume(speaker->getIP(), speaker->getCurrentVolume(), -18);
-	}
-	
-	Base::system().runScript(ips, commands);
-}
-
-static void setFlatEQ(const vector<string>& ips) {
-	auto speakers = Base::system().getSpeakers(ips);
-	vector<string> commands;
-	
-	for (auto* speaker : speakers) {
-		speaker->setVolume(SPEAKER_MAX_VOLUME);
-		speaker->clearAllEQs();
-		
-		string command =	"dspd -s -u preset; wait; ";
-		//command += 			"amixer -c1 cset numid=170 0x00,0x20,0x26,0xf3; wait; ";
-		command +=			"dspd -s -e ";
-		
-		for (auto setting : vector<int>(9, 0))
-			command += to_string(setting) + ",";
-			
-		command.pop_back();	
-		command +=			"; wait\n";
-		
-		commands.push_back(command);
-		
-		setSpeakerVolume(speaker->getIP(), speaker->getCurrentVolume(), -18);
-	}
-	
-	Base::system().runScript(ips, commands);
+	Base::system().runScript(speaker_ips, commands);
 }
 
 static vector<vector<double>> weightEQs(const MicWantedEQ& eqs) {
 	// Initialize to 0 EQ
-	vector<vector<double>> final_eqs(eqs.front().size(), vector<double>(9, 0));
+	vector<vector<double>> final_eqs(eqs.front().size(), vector<double>(DSP_MAX_BANDS, 0));
 	
 	// Go through all frequency bands
-	for (int j = 0; j < 9; j++) {
+	for (int j = 0; j < DSP_MAX_BANDS; j++) {
 		// Go through microphones
 		for (size_t i = 0; i < eqs.size(); i++) {
 			// Go through speakers
@@ -584,283 +405,202 @@ static double getFinalScore(const vector<double>& scores) {
 		total_score += db_difference * db_difference;
 	}
 	
-	cout << endl;
+	double final_score = 1 / (sqrt(total_score) / (double)scores.size());
+	
+	cout << "\nFinal score: " << final_score << endl;
 		
-	return 1 / (sqrt(total_score) / (double)scores.size());
+	return final_score;
 }
 
-static pair<size_t, double> getLoudestFrequencySource(const string& mic_ip, const vector<string>& speaker_ips, vector<double> simulated_eqs, int frequency_index, bool best_range, double change) {
-	// index, db, eq_range
+static size_t getLoudestSpeaker(const string& mic, const vector<string>& speakers, int frequency_index, double change) {
 	vector<tuple<size_t, double, double>> loudest;
 	
-	for (size_t index = 0; index < speaker_ips.size(); index++) {
-		// TODO: Should make sense, let's try it later on
-		// All additions to the speaker should affect the sound level this way
-		#if 0
-		auto& speaker = Base::system().getSpeaker(speaker_ips.at(index));
-	
-		if (speaker.isBlockedEQ(frequency_index))
-			continue;
-	
-		double eq_delta = simulated_eqs.at(index);
-		double volume_delta = speaker.getCorrectionVolume() - SPEAKER_MAX_VOLUME;
-		double base_level = Base::system().getSpeaker(mic_ip).getFrequencyResponseFrom(speaker_ips.at(index)).at(frequency_index);
+	for (size_t i = 0; i < speakers.size(); i++) {
+		auto* speaker = &Base::system().getSpeaker(speakers.at(i));
 		
-		double final_volume = base_level + volume_delta + eq_delta;
-		double db_change = simulated_eqs.at(index);
-		#endif
+		auto eq_delta = speaker->getNextEQ().at(frequency_index);
+		auto volume_delta = speaker->getNextVolume() - SPEAKER_MAX_VOLUME;
+		auto base_level = Base::system().getSpeaker(mic).getFrequencyResponseFrom(speaker->getIP()).at(frequency_index);
 		
-		// Always change the closest speaker first
-		double final_volume = Base::system().getSpeaker(mic_ip).getFrequencyResponseFrom(speaker_ips.at(index)).at(frequency_index);
-		double db_change = simulated_eqs.at(index);
+		auto final_volume = base_level + volume_delta + eq_delta;
 		
-		loudest.push_back(make_tuple(index, final_volume, db_change));
+		if (change < 0)
+			eq_delta *= -1;
+			
+		loudest.push_back(make_tuple(i, final_volume, eq_delta));
 	}
-	
-	if (loudest.empty())
-		loudest.push_back(make_tuple(0, 10, 10));
 	
 	// Sort by loudness
 	sort(loudest.begin(), loudest.end(), [] (auto& first, auto& second) {
 		return get<1>(first) > get<1>(second);
 	});
-			
-	if (!best_range) {		
-		// Always pick the loudest one since we don't care about gain
-		return { get<0>(loudest.front()), get<2>(loudest.front()) };
-	}
 	
 	// Pick the first with non-maxed EQ at chosen frequency
 	for (auto& information : loudest) {
-		// If we're improving a low EQ, let's do it
-		if (get<2>(information) < DSP_MIN_EQ && change > 0)
-			return { get<0>(information), get<2>(information) };
-			
-		// If we're lowering a high EQ, let's do it	
-		if (get<2>(information) > DSP_MAX_EQ && change < 0)
-			return { get<0>(information), get<2>(information) };
-			
 		// If it fits into the range, let's do it
-		if (get<2>(information) < DSP_MAX_EQ && get<2>(information) > DSP_MIN_EQ)
-			return { get<0>(information), get<2>(information) };
+		if (get<2>(information) < DSP_MAX_EQ)
+			return get<0>(information);
 	}
 	
-	// All speakers were maxed, pick the one with least maxed EQ
+	// All speakers are maxed, pick the one with least maxed EQ
 	sort(loudest.begin(), loudest.end(), [] (auto& first, auto& second) {
 		return get<2>(first) < get<2>(second);
 	});
 	
-	return { get<0>(loudest.front()), get<2>(loudest.front()) };
+	return get<0>(loudest.front());
 }
 
-static vector<double> getSpeakerEQChange(const string& mic_ip, const vector<string>& speaker_ips, int frequency_index, double wanted_change) {
-	// Added EQ
-	vector<double> added_eq(speaker_ips.size(), 0);
+static vector<double> getSpeakerEQChange(const string& mic, const vector<string>& speakers, int frequency_index, double change) {
+	// Add EQ to the most fitting speaker
+	// Do it this simple way since abs(change) <= 1
+	vector<double> eqs(speakers.size());
+	eqs.at(getLoudestSpeaker(mic, speakers, frequency_index, change)) += change;
 	
-	//cout << "Wanted change " << wanted_change << endl;
+	return eqs;
+}
+
+static void runFrequencyResponseScripts(const vector<string>& speakers, const vector<string>& mics, const string& filename) {
+	vector<string> scripts;
 	
-	for (int i = 0; i < lround(abs(wanted_change)); i++) {
-		// Current testing EQ
-		vector<double> test_eq(added_eq);
+	auto idle = Base::config().get<int>("idle_time");
+	auto play = Base::config().get<int>("play_time");
+	
+	for (size_t i = 0; i < speakers.size(); i++) {
+		string script = "sleep " + to_string(idle + i * (play + idle)) + " && ";
+		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename;
 		
-		for (size_t i = 0; i < test_eq.size(); i++)
-			test_eq.at(i) += Base::system().getSpeaker(speaker_ips.at(i)).getCorrectionEQ().at(frequency_index);
-
-		double db_change = wanted_change > 0 ? 1 : -1;
-		
-		for (auto& eq : added_eq)
-			eq += db_change;
-			
-		size_t main_index = 0;
-		auto index = getLoudestFrequencySource(mic_ip, speaker_ips, test_eq, frequency_index, false, db_change);
-		added_eq.at(index.first) += db_change;
-		test_eq.at(index.first) += db_change;
-		main_index = index.first;
-		
-		double range = index.second += db_change;
-		size_t iterations = 0;
-
-		// Can't make it lower or higher anyway, give it to another speaker
-		while (db_change < 0 ? (range <= DSP_MIN_EQ) : (range >= DSP_MAX_EQ)) {
-			index = getLoudestFrequencySource(mic_ip, speaker_ips, test_eq, frequency_index, true, db_change);
-			
-			if (index.first != main_index) {
-				added_eq.at(index.first) += db_change;
-				test_eq.at(index.first) += db_change;
-				range = index.second += db_change;
-			}
-			
-			// Already gone through all speakers
-			if (++iterations >= speaker_ips.size())
-				break;
-		}
+		scripts.push_back(script);
 	}
 	
-	//cout << "Added EQ: ";
-	//for_each(added_eq.begin(), added_eq.end(), [] (auto& eq) { cout << eq << " "; });
-	//cout << endl;
+	for (auto& ip : mics) {
+		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(idle + speakers.size() * (play + idle));
+		script +=		" /tmp/cap" + ip + ".wav";
+		
+		scripts.push_back(script);
+	}
 	
-	return added_eq;
-}
-
-SoundImageFFT9 Handle::checkSoundImage(const vector<string>& speakers, const vector<string>& mics, int play_time, int idle_time, bool corrected) {
 	vector<string> all_ips(speakers);
 	all_ips.insert(all_ips.end(), mics.begin(), mics.end());
 	
-	// Set corrected EQ if we're trying the corrected sound image or restore flat settings
-	if (corrected) {
-		setCorrectedEQ(speakers);
-	} else {
-		auto scripts = createDisableAudioSystem(all_ips);
-		Base::system().runScript(all_ips, scripts);
-		
-		setFlatEQ(speakers);
-		
-		// Clear saved information in mics as well
-		for (auto& mic_ip : mics)
-			Base::system().getSpeaker(mic_ip).clearAllEQs();
-	}
+	Base::system().runScript(all_ips, scripts);
+}
+
+static void runSoundImageRecordings(const vector<string>& mics) {
+	vector<string> scripts;
 	
-	if (!Config::get<bool>("no_scripts")) {
-		// Get sound image from available microphones
-		vector<string> scripts;
+	auto play = Base::config().get<int>("play_time");
+	
+	for (auto& ip : mics)
+		scripts.push_back("arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(play) + " /tmp/cap" + ip + ".wav");
 		
-		if (corrected)
-			scripts = createSoundImageScripts(speakers, mics, play_time, idle_time, Config::get<string>("white_noise"));
-		else
-			scripts = createSoundImageIndividualScripts(speakers, mics, play_time, idle_time, Config::get<string>("white_noise"));
-		
-		vector<string> all_ips(speakers);
-		all_ips.insert(all_ips.end(), mics.begin(), mics.end());
-		
-		if (runBasicScriptExternal(speakers, mics, all_ips, scripts, "data/" + Config::get<string>("white_noise"), "/tmp/").empty())
-			return SoundImageFFT9();
-	}
-		
-	SoundImageFFT9 final_result;
-	MicWantedEQ weighted_eq;
-	vector<double> scores;
-		
-	for (size_t i = 0; i < mics.size(); i++) {
-		string filename = "results/cap" + mics.at(i) + ".wav";
+	Base::system().runScript(mics, scripts);
+}
+
+void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	vector<string> all_ips(speaker_ips);
+	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
+	
+	// Disable audio system
+	disableAudioSystem(all_ips);
+	
+	// Send test files to speakers
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/");
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_long"), "/tmp/");
+	
+	// Set test settings
+	setTestSpeakerSettings(all_ips);
+	
+	// Run frequency responses
+	runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
+	
+	// Collect data
+	Base::system().getRecordings(mic_ips);
+	
+	auto idle = Base::config().get<int>("idle_time");
+	auto play = Base::config().get<int>("play_time");
+	
+	// Go through frequency analysis
+	for (auto& mic_ip : mic_ips) {
+		string filename = "results/cap" + mic_ip + ".wav";
 		
 		vector<short> data;
 		WavReader::read(filename, data);
 		
-		if (data.empty())
-			return SoundImageFFT9();
-		
-		if (corrected) {
-			size_t sound_start = ((double)idle_time + 0.3) * 48000;
-			size_t sound_average = getRMS(data, sound_start, sound_start + (48000 / 2));
-			
-			double db = 20 * log10(sound_average / (double)SHRT_MAX);
+		for (size_t i = 0; i < speaker_ips.size(); i++) {
+			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.33;
+			size_t sound_start = lround(sound_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
-			auto db_fft = getFFT9(data, sound_start, sound_start + (48000 / 2));
+			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
 			vector<double> dbs;
 			
-			cout << "Microphone \t" << mics.at(i) << endl;
-			
-			for (size_t z = 0; z < db_fft.size(); z++) {
-				auto& freq = db_fft.at(z);
-				double db_freq = 20 * log10(freq / (double)SHRT_MAX);
+			for (auto& db_linear : db_linears) {
+				double db = 20 * log10(db_linear / (double)SHRT_MAX);
 				
-				cout << "Frequency \t" << g_frequencies.at(z) << ": \t" << db_freq << endl;
-				dbs.push_back(db_freq);
+				dbs.push_back(db);
 			}
 			
-			// Is this the first run ever?
+			// DBs is vector of the current speaker with all its' frequency dBs
+			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
+		}
+	}
+	
+	// Start playing the long test tone
+	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + Base::config().get<string>("sound_image_file_long") + " &"));
+	
+	// Start iterating
+	for (int i = 0; i < iterations; i++) {
+		// Record some sound
+		runSoundImageRecordings(mic_ips);
+		
+		// Get recordings
+		Base::system().getRecordings(mic_ips);
+		
+		MicWantedEQ wanted_eqs;
+		vector<double> scores;
+		
+		// Analyze data
+		for (auto& ip : mic_ips) {
+			string filename = "results/cap" + ip + ".wav";
 			
-			if (!speakers.empty()) {
-				if (Base::system().getSpeaker(speakers.front()).isFirstRun()) {
-					double new_mean = getMean(dbs) - 3;
-					g_target_mean = new_mean;
-					
-					cout << "Set target mean " << g_target_mean << endl;
-				}
+			vector<short> data;
+			WavReader::read(filename, data);
+			
+			double sound_sec = 0.33;
+			size_t sound_start = lround(sound_sec * 48000.0);
+			
+			// Calculate FFT for 9 band as well
+			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
+			vector<double> dbs;
+			
+			for (auto& db_linear : db_linears) {
+				double db = 20 * log10(db_linear / (double)SHRT_MAX);
+				
+				dbs.push_back(db);
 			}
+			
+			// How much does this microphone get per frequency?
+			cout << "Microphone (" << ip << ") gets:\n";
+			for (size_t j = 0; j < dbs.size(); j++)
+				cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
 			
 			// Calculate score
 			auto score = getSoundImageScore(dbs);
 			
-			// Calculate correction & set it to speakers (alpha)
-			auto correction = getSoundImageCorrection(dbs);
+			// Calculate correction EQ
+			auto eq = getSoundImageCorrection(dbs);
 			
-			// Correct EQ
-			vector<vector<double>> corrected_dbs(speakers.size());
-			
-			// Calculate factors (room dependent?)
-			// Sets sensitive bands (i.e. small adjustments will amplify)
-			auto last_dbs = Base::system().getSpeaker(mics.at(i)).getLastChange().first;
-			auto last_corrections = Base::system().getSpeaker(mics.at(i)).getLastChange().second;
-
-			for (size_t f = 0; f < last_dbs.size(); f++) {
-				auto last_db = last_dbs.at(f);
-				auto last_correction = last_corrections.at(f);
-				auto current_db = dbs.at(f);
+			cout << "Which gives the correction EQ of:\n";
+			for (size_t j = 0; j < eq.size(); j++)
+				cout << "Frequency " << g_frequencies.at(j) << "\t " << eq.at(j) << " dB\n";
 				
-				// We did not change any settings for this band
-				if (last_correction < 0.5)
-					continue;
+			cout << "And a score of " << score << endl;
 				
-				double change = current_db - last_db;
-				double factor = change / last_correction;
+			// New EQs
+			vector<vector<double>> new_eqs(speaker_ips.size(), vector<double>(DSP_MAX_BANDS, 0));
 				
-				#if 0
-				Base::system().getSpeaker(mics.at(i)).setBandSensitive(f, true);
-				
-				// TODO: Calculate the factor & correction based on something else later on
-				if (factor > 2) {
-					// Set this band to sensitive
-					//Base::system().getSpeaker(mics.at(i)).setBandSensitive(f, true);
-				}
-				#endif
-				
-				if (abs(factor) > 6) {
-					// Which speaker caused this effect?
-					auto speaker_vector = Base::system().getSpeakers(speakers);
-					auto iterator = find_if(speaker_vector.begin(), speaker_vector.end(), [&f] (auto* speaker) {
-						return abs(speaker->getLastEQChange().at(f)) >= 0.5;
-					});
-					
-					if (iterator != speaker_vector.end()) {
-						cout << "FOUND SPEAKER TO BLOCK BAND\n";
-						
-						// Reset that speaker to the last value of the frequency band and prevent it from being changed again
-						//(*iterator)->resetLastEQChange(f);
-						//(*iterator)->preventEQChange(f);
-					} else {
-						cout << "DID NOT FIND MALICOUS SPEAKER\n";
-					}
-				}
-				
-				/*
-				if (speakers.size() > 1)
-					if (factor < 0)
-						correction.at(f) *= -1;
-						*/
-			}
-			
-			/*
-			cout << "Total EQ correction wanted by mic: ";
-			for_each(correction.begin(), correction.end(), [] (auto& eq) { cout << eq << endl; });
-			cout << endl;
-			*/
-			
-			// Go through all frequency bands
-			for (int d = 0; d < 9; d++) {
-				if (correction.at(d) > 1)
-					correction.at(d) = 1;
-				else if (correction.at(d) < -1)
-					correction.at(d) = -1;
-				// Is this band sensitive? Only adjust it with 1 dB each run
-				//if (Base::system().getSpeaker(mics.at(i)).isBandSensitive(d)) {
-					
-						
-				//	cout << "Band " << g_frequencies[d] << " is sensitive, meaning abs(-1)\n";
-				//}
-				
+			// Go through each frequency band
+			for (int j = 0; j < DSP_MAX_BANDS; j++) {
 				// Which speaker was already loudest here? Adjust that one since
 				// boosting less sounding speakers won't affect the sound image
 				// as much since combining them with a louder source will drown the
@@ -870,80 +610,63 @@ SoundImageFFT9 Handle::checkSoundImage(const vector<string>& speakers, const vec
 				// More information about incoherent/coherent sound sources here
 				// http://www.sengpielaudio.com/calculator-spl.htm
 				
-				auto wanted_change = correction.at(d);
+				auto change = eq.at(j);
+				auto speakers_eq_change = getSpeakerEQChange(ip, speaker_ips, j, change);
 				
-				// How the EQ should be
-				auto speaker_eq_change = getSpeakerEQChange(mics.at(i), speakers, d, wanted_change);
-				
-				for (size_t e = 0; e < corrected_dbs.size(); e++)
-					corrected_dbs.at(e).push_back(speaker_eq_change.at(e));
+				for (size_t k = 0; k < speaker_ips.size(); k++)
+					new_eqs.at(k).at(j) = speakers_eq_change.at(k);
 			}
 			
 			// Add this to further calculations when we have all the information
-			weighted_eq.push_back(corrected_dbs);
+			wanted_eqs.push_back(new_eqs);
 			scores.push_back(score);
-			
-			// Update last results
-			Base::system().getSpeaker(mics.at(i)).setLastChange(dbs, correction);
-			
-			// 9 band dB first, then time domain dB
-			dbs.push_back(db);
-			
-			final_result.push_back(make_tuple(mics.at(i), dbs, score));
-		} else {
-			for (size_t j = 0; j < speakers.size(); j++) {
-				size_t sound_start = ((double)idle_time + j * (play_time + 1) + 0.3) * 48000;
-				
-				// Calculate FFT for 9 band as well
-				auto db_fft = getFFT9(data, sound_start, sound_start + (48000 / 2));
-				vector<double> dbs;
-				
-				for (size_t z = 0; z < db_fft.size(); z++) {
-					auto& freq = db_fft.at(z);
-					double db_freq = 20 * log10(freq / (double)SHRT_MAX);
-					
-					dbs.push_back(db_freq);
-				}
-				
-				// DBs is vector of the current speaker with all it's frequency dBs
-				Base::system().getSpeaker(mics.at(i)).setFrequencyResponseFrom(speakers.at(j), dbs);
-			}
 		}
-	}
-	
-	if (corrected) {
+		
 		// Weight mics' different EQs against eachother
-		auto final_eqs = weightEQs(weighted_eq);
+		auto final_eqs = weightEQs(wanted_eqs);
 		
 		// Calculate final score
 		auto final_score = getFinalScore(scores);
 		
 		// Set new EQs
-		auto actual_speakers = Base::system().getSpeakers(speakers);
+		for (size_t j = 0; j < speaker_ips.size(); j++)
+			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(final_eqs.at(j), final_score);
+			
+		// Propagate it to clients
+		setSpeakersEQ(speaker_ips, TYPE_NEXT_EQ);
+			
+		// Update client here
+		Packet packet;
+		packet.addHeader(0x00);
 		
-		for (size_t d = 0; d < actual_speakers.size(); d++)
-			actual_speakers.at(d)->setCorrectionEQ(final_eqs.at(d), final_score);
+		for (auto& score : scores)
+			packet.addFloat(score);
+			
+		packet.addFloat(final_score);
+			
+		packet.finalize();
+		Base::network().addOutgoingPacket(g_current_connection->getSocket(), packet);
 	}
 	
-	return final_result;
+	// Set best EQ automatically
+	setBestEQ(speaker_ips, mic_ips);
 }
 
-vector<double> Handle::setBestEQ(const vector<string>& speakers, const vector<string>& mics) {
-	vector<string> all_ips(speakers);
-	all_ips.insert(all_ips.end(), mics.begin(), mics.end());
+void Handle::resetIPs(const vector<string>& ips) {
+	// Reset speakers & enable audio system
+	resetEverything(ips);
+	enableAudioSystem(ips);
+}
+
+void Handle::setBestEQ(const vector<string>& speakers, const vector<string>& mics) {
+	// Reset mics & enable audio system
+	resetIPs(mics);
 	
-	// Enable audio system again
-	auto scripts = createEnableAudioSystem(all_ips);
-	Base::system().runScript(all_ips, scripts);
-	
-	return setSpeakersBestEQ(speakers, mics);
+	// Set best EQ & enable audio system for speakers
+	setSpeakersEQ(speakers, TYPE_BEST_EQ);
+	enableAudioSystem(speakers);
 }
 
 void Handle::setEQStatus(const vector<string>& ips, bool status) {
-	string command =	"dspd -s -" + string((status ? "u" : "b"));
-	command +=			" preset; wait\n";
-		
-	cout << "Change EQ command: " << command << endl;
-	
-	Base::system().runScript(ips, vector<string>(ips.size(), command));
+	Base::system().runScript(ips, vector<string>(ips.size(), "dspd -s -" + string((status ? "u" : "b")) + " preset"));
 }

@@ -1,4 +1,4 @@
-Build essentials:
+Build essentials (Debian-based):
 ./install.sh
 
 FIRST USE (Server & Client):

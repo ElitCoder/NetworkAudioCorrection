@@ -1,7 +1,7 @@
 #include "Goertzel.h"
 #include "Recording.h"
 #include "WavReader.h"
-#include "Config.h"
+#include "Base.h"
 
 #include <iostream>
 #include <cmath>
@@ -12,6 +12,41 @@ static const int FREQ_N = 16;
 static const int FREQ_FREQ = 4000;
 static const double FREQ_REDUCING = 0.001;
 static const double FREQ_THRESHOLD = 0.01;
+
+// Taken from git/SO
+double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data)
+{
+    int     k,i;
+    float   floatnumSamples;
+    float   omega,sine,cosine,coeff,q0,q1,q2,magnitude,real,imag;
+
+    float   scalingFactor = numSamples / 2.0;
+
+    floatnumSamples = (float) numSamples;
+    k = (int) (0.5 + ((floatnumSamples * TARGET_FREQUENCY) / (float)SAMPLING_RATE));
+    omega = (2.0 * M_PI * k) / floatnumSamples;
+    sine = sin(omega);
+    cosine = cos(omega);
+    coeff = 2.0 * cosine;
+    q0=0;
+    q1=0;
+    q2=0;
+
+    for(i=0; i<numSamples; i++)
+    {
+        q0 = coeff * q1 - q2 + data[i];
+        q2 = q1;
+        q1 = q0;
+    }
+
+    // calculate the real and imaginary results
+    // scaling appropriately
+    real = (q1 - q2 * cosine) / scalingFactor;
+    imag = (q2 * sine) / scalingFactor;
+
+    magnitude = sqrtf(real*real + imag*imag);
+    return magnitude;
+}
 
 static double calculateDistance(Recording& master, Recording& recording) {
 	long long r12 = recording.getTonePlayingWhen(master.getId());
@@ -48,7 +83,7 @@ static void analyzeSound(const vector<string>& filenames, const vector<string>& 
 		if (recording.getData().empty())
 			return;
 				
-		recording.findStartingTones(filenames.size(), FREQ_N, FREQ_THRESHOLD, FREQ_REDUCING, FREQ_FREQ, (Config::get<int>("speaker_play_length") + 1) * 48000, Config::get<int>("idle_time"));
+		recording.findStartingTones(filenames.size(), FREQ_N, FREQ_THRESHOLD, FREQ_REDUCING, FREQ_FREQ, (Base::config().get<int>("speaker_play_length") + 1) * 48000, Base::config().get<int>("idle_time"));
 	}
 }
 
