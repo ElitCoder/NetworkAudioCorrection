@@ -1,0 +1,22 @@
+# Connection settings
+port: 10200
+
+# Files
+white_noise: 9_band_1s.wav
+goertzel: testTone.wav
+
+# Testing
+no_scripts: 0
+
+# Script settings
+speaker_play_length: 1
+idle_time: 2
+extra_recording: 0
+
+# Localization3D (degrees and meters)
+degree_accuracy: 10
+point_accuracy: 1
+fast: 1
+use_2d: 1
+# timeout in seconds
+timeout: 10
