@@ -46,6 +46,8 @@ static double g_target_mean = -45;
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
                            	'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'	};
+							
+static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 string getHexString(unsigned char* data, int len) {
 	string s(len * 2, ' ');
@@ -257,8 +259,13 @@ static vector<double> getFFT9(const vector<short>& data, size_t start, size_t en
 static double getSoundImageScore(const vector<double>& dbs) {
 	double score = 0;
 	
-	for (auto& db : dbs)
-		score += (g_target_mean - db) * (g_target_mean - db);
+	for (size_t i = 0; i < dbs.size(); i++) {
+		// Get score against chosen profile
+		double profile_db = g_target_mean + g_normalization_profile.at(i);
+		double db = dbs.at(i);
+		
+		score += (profile_db - db) * (profile_db - db);
+	}
 	
 	return 1 / sqrt(score);
 }
@@ -266,8 +273,14 @@ static double getSoundImageScore(const vector<double>& dbs) {
 static vector<double> getSoundImageCorrection(vector<double> dbs) {
 	vector<double> eq;
 	
-	for (auto& db : dbs)
-		eq.push_back(g_target_mean - db);
+	for (size_t i = 0; i < dbs.size(); i++) {
+		// Get score against chosen profile
+		double profile_db = g_target_mean + g_normalization_profile.at(i);
+		double db = dbs.at(i);
+		double difference = profile_db - db;
+
+		eq.push_back(difference);
+	}
 	
 	return eq;
 }
@@ -383,8 +396,6 @@ static vector<vector<double>> weightEQs(const MicWantedEQ& eqs) {
 			for (size_t k = 0; k < eqs.at(i).size(); k++) {
 				// Get EQ at frequency j
 				double wanted_eq = eqs.at(i).at(k).at(j);
-
-				wanted_eq /= 2.0;
 				
 				/*
 				if (eqs.front().size() == 1) {
@@ -543,6 +554,10 @@ static void threadLongTone(const vector<string>& speaker_ips) {
 }
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	cout << "Starting normalizatio to profile: ";
+	for_each(g_normalization_profile.begin(), g_normalization_profile.end(), [] (auto& setting) { cout << setting << " "; });
+	cout << endl;
+	
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
 	
@@ -576,11 +591,11 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		WavReader::read(filename, data);
 		
 		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.33;
+			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.45;
 			size_t sound_start = lround(sound_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
-			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
+			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 2));
 			vector<double> dbs;
 			
 			for (auto& db_linear : db_linears) {
@@ -621,11 +636,11 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			vector<short> data;
 			WavReader::read(filename, data);
 			
-			double sound_sec = 0.33;
+			double sound_sec = 0.45;
 			size_t sound_start = lround(sound_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
-			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
+			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 2));
 			vector<double> dbs;
 			
 			for (auto& db_linear : db_linears) {
@@ -682,6 +697,18 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		
 		// Calculate final score
 		auto final_score = getFinalScore(scores);
+		
+		#if 0
+		for (size_t j = 0; j < speaker_ips.size(); j++) {
+			for (size_t k = 0; k < final_eqs.at(j).size(); k++) {
+				if (final_eqs.at(j).at(k) > 1)
+					final_eqs.at(j).at(k) = 1;
+					
+				if (final_eqs.at(j).at(k) < -1)
+					final_eqs.at(j).at(k) = -1;	
+			}
+		}
+		#endif
 		
 		// Set new EQs
 		for (size_t j = 0; j < speaker_ips.size(); j++)

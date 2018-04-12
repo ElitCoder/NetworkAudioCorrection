@@ -29,9 +29,9 @@ static NetworkCommunication* g_network;
 */
 
 // Speakers
-static vector<string> g_ips = { "172.25.13.200", "172.25.12.99" };
+static vector<string> g_ips = { "172.25.13.200", "172.25.9.38", "172.25.11.47", "172.25.12.168", "172.25.13.250", "172.25.12.99" };
 // External microphones
-static vector<string> g_external_microphones = { "172.25.9.38" };
+static vector<string> g_external_microphones = { "172.25.15.233" };
 
 Packet createStartSpeakerLocalization(const vector<string>& ips, bool force) {
 	Packet packet;
