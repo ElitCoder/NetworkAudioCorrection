@@ -445,29 +445,17 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 	Test different levels of dB until we find a common factor
 */
 static void findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
-	vector<string> all_ips(speaker_ips);
-	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
-	
-	// Disable audio system
-	disableAudioSystem(all_ips);
-	
-	// Send test file to speakers
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
-	
-	// Set test settings
-	setTestSpeakerSettings(all_ips);
-	
-	// Set test DSP gain
-	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
-	
 	vector<vector<vector<vector<double>>>> change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	vector<vector<vector<vector<double>>>> last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	
 	double step = 3; // How much each iteration should alterate the gain
 	
+	if (iterations * step > 12)
+		cout << "WARNING: Using " << iterations << " iterations will hit the DSP EQ limit\n";
+	
 	for (int i = 0; i < iterations; i++) {
 		// Set EQ based on which iteration we're in
-		vector<double> eq(DSP_MAX_BANDS, step);
+		vector<double> eq(DSP_MAX_BANDS, (i == 0 ? 0 : step));
 		
 		for (size_t j = 0; j < speaker_ips.size(); j++)
 			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(eq, 0);
@@ -550,14 +538,40 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 	}
 }
 
-void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
-	// Find correction factor
-	if (true) {
-		findCorrectionFactor(speaker_ips, mic_ips, iterations);
+static void runTestSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, const string& filename) {
+	vector<string> scripts;
+	
+	auto idle = Base::config().get<int>("idle_time");
+	auto play = Base::config().get<int>("play_time");
+	
+	string play_command =	"sleep " + to_string(idle) + "; wait; ";
+	play_command +=			"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename + "; wait\n";
+	
+	for (size_t i = 0; i < speaker_ips.size(); i++)
+		scripts.push_back(play_command);
+	
+	for (auto& ip : mic_ips) {
+		string record_command =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(idle + play + idle) + " /tmp/cap" + ip + ".wav; wait\n";
+		
+		scripts.push_back(record_command);
 	}
 	
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
+	
+	Base::system().runScript(all_ips, scripts);
+}
+
+void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	vector<string> all_ips(speaker_ips);
+	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
+	
+	// Disable audio system
+	disableAudioSystem(all_ips);
+	
+	// Send test files to speakers
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", false);
 	
 	// Set test settings
 	setTestSpeakerSettings(all_ips);
@@ -565,13 +579,25 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Set test DSP gain
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
+	// Find correction factor
+	if (true /* Use some switch later on, let's calibrate every time for now */) {
+		findCorrectionFactor(speaker_ips, mic_ips, iterations);
+		
+		// Set test settings again
+		setTestSpeakerSettings(all_ips);
+		
+		// Set test DSP gain again
+		setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
+	}
+	
+	// TODO: Check sound image using white noise before trying to EQ
+	
 	// Run frequency responses
 	runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
 	
 	// Collect data
 	Base::system().getRecordings(mic_ips);
 	
-	// Weight data against profile and microphones
 	auto idle = Base::config().get<int>("idle_time");
 	auto play = Base::config().get<int>("play_time");
 	
@@ -623,7 +649,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		wanted_eqs.push_back(new_eqs);
 	}
 	
-	// Weight mics' different EQs against eachother
+	// Weight data against profile and microphones
 	auto final_eqs = weightEQs(speaker_ips, mic_ips, wanted_eqs);
 	
 	// Set new EQs
@@ -636,9 +662,19 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	}
 		
 	// Propagate this EQ to the speakers
-	setBestEQ(speaker_ips, mic_ips);
+	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	
-	// TODO: Play white noise here to make sure that the sound image is correct
+	// Play white noise from all speakers to check sound image & collect the recordings
+	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
+	Base::system().getRecordings(mic_ips);
+	
+	// TODO: Analyze data from white noise
+	// Divide every band using this?
+	// https://www.engineeringtoolbox.com/octave-bands-frequency-limits-d_1602.html
+	// i.e FFT and look at these frequency ranges
+	
+	// Reset mics & set best EQ
+	setBestEQ(speaker_ips, mic_ips);
 }
 
 void Handle::resetIPs(const vector<string>& ips) {
