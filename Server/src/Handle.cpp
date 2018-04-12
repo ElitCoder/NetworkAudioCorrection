@@ -451,9 +451,8 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 	// Disable audio system
 	disableAudioSystem(all_ips);
 	
-	// Send test files to speakers
+	// Send test file to speakers
 	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_long"), "/tmp/", false);
 	
 	// Set test settings
 	setTestSpeakerSettings(all_ips);
