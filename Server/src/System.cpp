@@ -68,18 +68,21 @@ bool System::checkConnection(const vector<string>& ips) {
 	return true;
 }
 
-void System::runScript(const vector<string>& ips, const vector<string>& scripts) {
+SSHOutput System::runScript(const vector<string>& ips, const vector<string>& scripts, bool temporary_connection) {
+	if (temporary_connection) {
+		// Do this scripting for a new temporary connection
+		return System().runScript(ips, scripts);
+	}
+	
 	// Make sure all speakers are connected
 	checkConnection(ips);
 	
-	/*
 	for (size_t i = 0; i < ips.size(); i++) {
 		cout << "SSH: running script (" << ips.at(i) << ")\n**************\n";
 		cout << scripts.at(i) << "**************\n\n";
 	}
-	*/
 	
-	//cout << "Running SSH commands... " << flush;
+	cout << "Running SSH commands... " << flush;
 	
 	ssh_.setSetting(SETTING_ENABLE_SSH_OUTPUT_VECTOR_STYLE, true);
 	auto outputs = ssh_.command(ips, scripts);
@@ -87,12 +90,12 @@ void System::runScript(const vector<string>& ips, const vector<string>& scripts)
 	
 	// TODO: Add option to print outputs here
 	
-	/*
 	if (outputs.empty())
 		cout << "ERROR\n";
 	else
 		cout << "done\n";
-	*/
+		
+	return outputs;
 }
 
 vector<Speaker*> System::getSpeakers(const vector<string>& ips) {
@@ -148,12 +151,12 @@ Speaker& System::getSpeaker(const string& ip) {
 	}
 }
 
-bool System::sendFile(const vector<string>& ips, const string& from, const string& to) {
+bool System::sendFile(const vector<string>& ips, const string& from, const string& to, bool overwrite) {
 	checkConnection(ips);
 	
-	//cout << "Sending file " << from << " -> " << to << "... " << flush;
-	auto status = ssh_.transferRemote(ips, vector<string>(ips.size(), from), vector<string>(ips.size(), to));
-	//cout << (status ? "done\n" : "ERROR\n");
+	cout << "Sending file " << from << " -> " << to << "... " << flush;
+	auto status = ssh_.transferRemote(ips, vector<string>(ips.size(), from), vector<string>(ips.size(), to), overwrite);
+	cout << (status ? "done\n" : "ERROR\n");
 	
 	return status;
 }
@@ -161,15 +164,13 @@ bool System::sendFile(const vector<string>& ips, const string& from, const strin
 bool System::getFile(const vector<string>& ips, const vector<string>& from, const vector<string>& to) {
 	checkConnection(ips);
 	
-	/*
 	for (size_t i = 0; i < ips.size(); i++) {
 		cout << "Retrieving (" << ips.at(i) << ") " << from.at(i) << " -> " << to.at(i) << endl;
 	}
-	*/
 	
-	//cout << "Retrieving files from SSH... " << flush;
+	cout << "Retrieving files from SSH... " << flush;
 	auto status = ssh_.transferLocal(ips, from, to, true);
-	//cout << (status ? "done\n" : "ERROR\n") << flush;
+	cout << (status ? "done\n" : "ERROR\n") << flush;
 	
 	return status;
 }

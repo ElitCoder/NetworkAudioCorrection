@@ -11,8 +11,8 @@
 // Contains SSH connections to all speakers and current speaker settings
 class System {
 public:
-	void runScript(const std::vector<std::string>& ips, const std::vector<std::string>& scripts);
-	bool sendFile(const std::vector<std::string>& ips, const std::string& from, const std::string& to);
+	SSHOutput runScript(const std::vector<std::string>& ips, const std::vector<std::string>& scripts, bool temporary_connection = false);
+	bool sendFile(const std::vector<std::string>& ips, const std::string& from, const std::string& to, bool overwrite = true);
 	bool getFile(const std::vector<std::string>& ips, const std::vector<std::string>& from, const std::vector<std::string>& to);
 	
 	bool getRecordings(const std::vector<std::string>& ips);

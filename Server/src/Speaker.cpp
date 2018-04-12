@@ -48,6 +48,9 @@ void Speaker::setVolume(int volume) {
 }
 
 vector<double> Speaker::getNextEQ() {
+	if (correction_eq_.empty())
+		return vector<double>(DSP_MAX_BANDS, 0);
+		
 	return correction_eq_;
 }
 

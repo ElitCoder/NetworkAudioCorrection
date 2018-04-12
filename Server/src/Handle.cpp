@@ -82,10 +82,12 @@ void to_523(double param_dec, unsigned char * param_hex) {
 }
 
 static void enableAudioSystem(const vector<string>& ips) {
+	cout << "Starting audio system\n";
 	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl start audio_relayd"));
 }
 
 static void disableAudioSystem(const vector<string>& ips) {
+	cout << "Stopping audio system\n";
 	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl stop audio*"));
 }
 
@@ -177,7 +179,7 @@ PlacementOutput Handle::runLocalization(const vector<string>& ips, bool force_up
 	
 	if (!Base::config().get<bool>("no_scripts")) {
 		// Create scripts
-		int play_time = Base::config().get<int>("speaker_play_length");
+		int play_time = Base::config().get<int>("play_time");
 		int idle_time = Base::config().get<int>("idle_time");
 		
 		auto scripts = createRunLocalizationScripts(ips, play_time, idle_time, Base::config().get<string>("goertzel"));
@@ -496,6 +498,22 @@ static void runSoundImageRecordings(const vector<string>& mics) {
 	Base::system().runScript(mics, scripts);
 }
 
+static mutex g_long_tone_mutex;
+static condition_variable g_long_tone_cv;
+static bool g_lone_tone_ready = false;
+
+static void threadLongTone(const vector<string>& speaker_ips) {
+	{
+		lock_guard<mutex> lock(g_long_tone_mutex);
+        g_lone_tone_ready = true;
+	}
+	
+	// Notify sound image thread that the script has started
+	g_long_tone_cv.notify_one();
+
+	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + Base::config().get<string>("sound_image_file_long") + ""), true);
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
@@ -504,8 +522,8 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	disableAudioSystem(all_ips);
 	
 	// Send test files to speakers
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/");
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_long"), "/tmp/");
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_long"), "/tmp/", false);
 	
 	// Set test settings
 	setTestSpeakerSettings(all_ips);
@@ -545,8 +563,14 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		}
 	}
 	
-	// Start playing the long test tone
-	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + Base::config().get<string>("sound_image_file_long") + " &"));
+	thread long_tone_thread(threadLongTone, ref(speaker_ips));
+	
+	{
+		unique_lock<mutex> lock(g_long_tone_mutex);
+		g_long_tone_cv.wait(lock, [] { return g_lone_tone_ready; });
+		
+		this_thread::sleep_for(chrono::seconds(2)); // TODO: Remove this later
+	}
 	
 	// Start iterating
 	for (int i = 0; i < iterations; i++) {
@@ -648,8 +672,14 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		Base::network().addOutgoingPacket(g_current_connection->getSocket(), packet);
 	}
 	
+	// Kill long tone
+	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "killall -9 aplay"));
+	
 	// Set best EQ automatically
 	setBestEQ(speaker_ips, mic_ips);
+	
+	// Wait for thread to terminate
+	long_tone_thread.join();
 }
 
 void Handle::resetIPs(const vector<string>& ips) {

@@ -3,14 +3,14 @@ port: 10200
 
 # Files
 goertzel: testTone.wav
-sound_image_long: 9_freq_480s.wav
-sound_image_short: 9_freq_1s.wav
+sound_image_file_long: 9_freq_480s.wav
+sound_image_file_short: 9_freq_1s.wav
 
 # Testing
 no_scripts: 0
 
 # Script settings
-speaker_play_length: 1
+play_time: 1
 idle_time: 1
 
 # Localization3D (degrees and meters)

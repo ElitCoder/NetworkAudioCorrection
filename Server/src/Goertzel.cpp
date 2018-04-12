@@ -83,7 +83,7 @@ static void analyzeSound(const vector<string>& filenames, const vector<string>& 
 		if (recording.getData().empty())
 			return;
 				
-		recording.findStartingTones(filenames.size(), FREQ_N, FREQ_THRESHOLD, FREQ_REDUCING, FREQ_FREQ, (Base::config().get<int>("speaker_play_length") + 1) * 48000, Base::config().get<int>("idle_time"));
+		recording.findStartingTones(filenames.size(), FREQ_N, FREQ_THRESHOLD, FREQ_REDUCING, FREQ_FREQ, (Base::config().get<int>("play_time") + 1) * 48000, Base::config().get<int>("idle_time"));
 	}
 }
 

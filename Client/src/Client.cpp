@@ -29,9 +29,9 @@ static NetworkCommunication* g_network;
 */
 
 // Speakers
-static vector<string> g_ips = { "172.25.9.38"  };
+static vector<string> g_ips = { "172.25.9.38" };
 // External microphones
-static vector<string> g_external_microphones = { "172.25.12.99", "172.25.13.200" };
+static vector<string> g_external_microphones = { "172.25.12.99" };
 
 Packet createStartSpeakerLocalization(const vector<string>& ips, bool force) {
 	Packet packet;
@@ -179,7 +179,7 @@ void soundImage() {
 	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, iterations));
 	
 	for (int i = 0; i < iterations; i++) {
-		cout << "Running iteration\t " << (i + 1) << " of\t " << iterations << "\t ..." << flush;
+		cout << "Running iteration\t " << (i + 1) << " of\t" << iterations << "\t" << flush;
 		auto answer = g_network->waitForIncomingPacket();
 		answer.getByte();
 		cout << "done\n";

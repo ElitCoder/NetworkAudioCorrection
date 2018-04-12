@@ -7,6 +7,7 @@
 
 using PlacementOutput = std::vector<std::tuple<std::string, std::array<double, 3>, std::vector<std::pair<std::string, double>>>>;
 using MicWantedEQ = std::vector<std::vector<std::vector<double>>>;
+using SSHOutput = std::vector<std::pair<std::string, std::vector<std::string>>>;
 
 class Handle {
 public:

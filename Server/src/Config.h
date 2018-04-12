@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <sstream>
+#include <iostream>
 
 struct NoConfigException {
 };
@@ -17,8 +18,11 @@ public:
 	T get(const std::string& key) {
 		auto iterator = configs_.find(key);
 		
-		if (iterator == configs_.end())
+		if (iterator == configs_.end()) {
+			std::cout << "WARNING: Key " << key << " not found\n";
+			
 			throw NoConfigException();
+		}
 			
 		std::istringstream stream(iterator->second);
 		T value;
