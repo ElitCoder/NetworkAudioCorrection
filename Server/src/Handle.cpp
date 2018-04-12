@@ -383,7 +383,7 @@ static vector<vector<double>> weightEQs(const MicWantedEQ& eqs) {
 			for (size_t k = 0; k < eqs.at(i).size(); k++) {
 				// Get EQ at frequency j
 				double wanted_eq = eqs.at(i).at(k).at(j);
-				
+
 				wanted_eq /= 2.0;
 				
 				/*
@@ -469,10 +469,22 @@ static size_t getLoudestSpeaker(const string& mic, const vector<string>& speaker
 }
 
 static vector<double> getSpeakerEQChange(const string& mic, const vector<string>& speakers, int frequency_index, double change) {
-	// Add EQ to the most fitting speaker
-	// Do it this simple way since abs(change) <= 1
 	vector<double> eqs(speakers.size());
+	
+	#if 0
+	// Add EQ to the most fitting speaker
 	eqs.at(getLoudestSpeaker(mic, speakers, frequency_index, change)) += change;
+	#endif
+	
+	// Do it smarter, add small dB values to each speaker instead
+	// and see if some other speaker gets loudest
+	double step = 0.01;
+	for (double i = 0; i < abs(change); i += step) {
+		double speaker_change = change < 0 ? step * (-1) : step;
+		
+		// Add this small step to the loudest speaker without maxed EQ
+		eqs.at(getLoudestSpeaker(mic, speakers, frequency_index, change)) += speaker_change;
+	}
 	
 	return eqs;
 }
