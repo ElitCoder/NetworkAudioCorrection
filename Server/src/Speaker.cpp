@@ -43,7 +43,7 @@ Speaker::SpeakerPlacement Speaker::getPlacement() {
 	return placement_;
 }
 
-void Speaker::setVolume(int volume) {
+void Speaker::setVolume(double volume) {
 	volume_ = volume;
 }
 

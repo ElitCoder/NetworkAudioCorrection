@@ -37,7 +37,7 @@ public:
 	
 	// Basic speaker setters
 	void setIP(const std::string& ip);
-	void setVolume(int volume);
+	void setVolume(double volume);
 	void setOnline(bool status);
 	
 	// EQ setters

@@ -83,22 +83,22 @@ void to_523(double param_dec, unsigned char * param_hex) {
 
 static void enableAudioSystem(const vector<string>& ips) {
 	cout << "Starting audio system\n";
-	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl start audio_relayd"));
+	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl start audio_relayd; wait\n"));
 }
 
 static void disableAudioSystem(const vector<string>& ips) {
 	cout << "Stopping audio system\n";
-	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl stop audio*"));
+	Base::system().runScript(ips, vector<string>(ips.size(), "systemctl stop audio*; wait\n"));
 }
 
 // It's like we were not here
 void resetEverything(const vector<string>& ips) {
-	string command = 	"dspd -s -w && ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on && "; 				/* 57 is 0 dB for C1004-e */
-	command +=			"amixer -c1 sset 'Capture' 63 && ";
-	command +=			"dspd -s -p flat && ";
-	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00 && "; 	/* Sets DSP gain to 0 */
-	command +=			"amixer -c1 sset 'PGA Boost' 2";
+	string command = 	"dspd -s -w; wait; ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; "; 				/* 57 is 0 dB for C1004-e */
+	command +=			"amixer -c1 sset 'Capture' 63; wait; ";
+	command +=			"dspd -s -p flat; wait; ";
+	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait; "; 	/* Sets DSP gain to 0 */
+	command +=			"amixer -c1 sset 'PGA Boost' 2; wait\n";
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
 	
@@ -110,9 +110,9 @@ void resetEverything(const vector<string>& ips) {
 }
 
 static void setTestSpeakerSettings(const vector<string>& ips) {
-	string command =	"dspd -s -w && dspd -s -m && dspd -s -u limiter && dspd -s -u static && dspd -s -u preset && dspd -s -p flat && ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on && amixer -c1 sset 'Capture' 63 && amixer -c1 sset 'PGA Boost' 2 && ";
-	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00";		/* Sets DSP gain to 0 */
+	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; dspd -s -u preset; wait; dspd -s -p flat; wait; ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 2; wait; ";
+	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
 	
@@ -272,12 +272,13 @@ static vector<double> getSoundImageCorrection(vector<double> dbs) {
 	return eq;
 }
 
-static void setSpeakerVolume(const string& ip, double volume, int base_dsp_level) {
-	auto& speaker = Base::system().getSpeaker(ip);
+static void setSpeakerVolume(const string& ip, double volume, double base_dsp_level) {
+	auto& speaker = Base::system().getSpeaker(ip);	
 	speaker.setVolume(volume);
 	
 	cout << "Setting speaker volume to " << speaker.getVolume() << endl;
 	double delta = speaker.getVolume() - SPEAKER_MAX_VOLUME;
+	cout << "Delta: " << delta << endl;
 	
 	// -18 gives the speaker 6 dB headroom to boost before DSP limiting on maxed EQ
 	double final_level = base_dsp_level + delta;
@@ -344,12 +345,14 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			}
 		}
 		
-		string command = "dspd -s -u preset && dspd -s -e ";
+		string command = "dspd -s -u preset; wait; dspd -s -e ";
 		
 		for (auto setting : eq)
 			command += to_string(setting) + ",";
 			
 		command.pop_back();
+		command +=		"; wait\n";
+		
 		commands.push_back(command);
 		
 		double dsp_gain;
@@ -381,6 +384,19 @@ static vector<vector<double>> weightEQs(const MicWantedEQ& eqs) {
 				// Get EQ at frequency j
 				double wanted_eq = eqs.at(i).at(k).at(j);
 				
+				wanted_eq /= 2.0;
+				
+				/*
+				if (eqs.front().size() == 1) {
+					wanted_eq /= 2.0;
+				} else {
+					if (wanted_eq > 1)
+						wanted_eq = 1;
+					if (wanted_eq < -1)
+						wanted_eq = -1;
+				}
+				*/
+
 				final_eqs.at(k).at(j) += wanted_eq;
 			}
 		}
@@ -468,15 +484,15 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 	auto play = Base::config().get<int>("play_time");
 	
 	for (size_t i = 0; i < speakers.size(); i++) {
-		string script = "sleep " + to_string(idle + i * (play + idle)) + " && ";
-		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename;
+		string script = "sleep " + to_string(idle + i * (play + idle)) + "; wait; ";
+		script +=		"aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + filename + "; wait\n";
 		
 		scripts.push_back(script);
 	}
 	
 	for (auto& ip : mics) {
 		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(idle + speakers.size() * (play + idle));
-		script +=		" /tmp/cap" + ip + ".wav";
+		script +=		" /tmp/cap" + ip + ".wav; wait\n";
 		
 		scripts.push_back(script);
 	}
@@ -493,7 +509,7 @@ static void runSoundImageRecordings(const vector<string>& mics) {
 	auto play = Base::config().get<int>("play_time");
 	
 	for (auto& ip : mics)
-		scripts.push_back("arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(play) + " /tmp/cap" + ip + ".wav");
+		scripts.push_back("arecord -D audiosource -r 48000 -f S16_LE -c 1 -d " + to_string(play) + " /tmp/cap" + ip + ".wav; wait\n");
 		
 	Base::system().runScript(mics, scripts);
 }
@@ -511,7 +527,7 @@ static void threadLongTone(const vector<string>& speaker_ips) {
 	// Notify sound image thread that the script has started
 	g_long_tone_cv.notify_one();
 
-	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + Base::config().get<string>("sound_image_file_long") + ""), true);
+	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "aplay -D localhw_0 -r 48000 -f S16_LE /tmp/" + Base::config().get<string>("sound_image_file_long") + "; wait\n"), true);
 }
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
@@ -527,6 +543,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	// Set test settings
 	setTestSpeakerSettings(all_ips);
+	
+	// Set test DSP gain
+	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Run frequency responses
 	runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
@@ -673,7 +692,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	}
 	
 	// Kill long tone
-	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "killall -9 aplay"));
+	Base::system().runScript(speaker_ips, vector<string>(speaker_ips.size(), "killall -9 aplay; wait\n"));
 	
 	// Set best EQ automatically
 	setBestEQ(speaker_ips, mic_ips);
@@ -698,5 +717,5 @@ void Handle::setBestEQ(const vector<string>& speakers, const vector<string>& mic
 }
 
 void Handle::setEQStatus(const vector<string>& ips, bool status) {
-	Base::system().runScript(ips, vector<string>(ips.size(), "dspd -s -" + string((status ? "u" : "b")) + " preset"));
+	Base::system().runScript(ips, vector<string>(ips.size(), "dspd -s -" + string((status ? "u" : "b")) + " preset; wait\n"));
 }
