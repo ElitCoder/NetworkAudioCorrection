@@ -6,7 +6,7 @@
 
 using namespace std;
 
-extern double g_speaker_dsp_factor;
+extern vector<double> g_speaker_dsp_factor;
 
 const string& Speaker::getIP() const {
 	return ip_;
@@ -160,7 +160,7 @@ void Speaker::setNextEQ(const vector<double>& eq, double score) {
 		correction_eq_ = vector<double>(DSP_MAX_BANDS, 0);
 		
 	for (size_t i = 0; i < eq.size(); i++)
-		correction_eq_.at(i) += eq.at(i) * g_speaker_dsp_factor;
+		correction_eq_.at(i) += eq.at(i) / g_speaker_dsp_factor.at(i);
 	
 	correction_volume_ = volume_ + correctMaxEQ(correction_eq_);
 	

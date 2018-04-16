@@ -25,8 +25,7 @@ enum {
 enum {
 	TYPE_BEST_EQ,
 	TYPE_NEXT_EQ,
-	TYPE_FLAT_EQ,
-	TYPE_FACTOR_EQ
+	TYPE_FLAT_EQ
 };
 
 // We're not multithreading anyway
@@ -42,15 +41,16 @@ static vector<string> g_frequencies = {	"63",
 										"8000",
 										"16000" };
 
+// User specific EQ (on top of flat)
+static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 static double g_target_mean = -45;
-double g_speaker_dsp_factor = 1; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor = { 0.856162, 0.971586, 0.980661, 0.9969, 0.991612, 0.966417, 0.985798, 0.952646, 1.11358 }; // Which factor the EQ's should be multiplied with to get the right result
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
                            	'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'	};
 							
-static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 string getHexString(unsigned char* data, int len) {
 	string s(len * 2, ' ');
 	
@@ -362,7 +362,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
 				break;
 				
-			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -42;
+			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -21; // More headroom for increasing the volume
 				break;
 		}
 		
@@ -445,17 +445,11 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 /*
 	Test different levels of dB until we find a common factor
 */
-static void findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
-	// Set to low dB DSP gain
-	//setSpeakersEQ(speaker_ips, TYPE_FACTOR_EQ);
-	
-	vector<vector<vector<vector<double>>>> change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
-	vector<vector<vector<vector<double>>>> last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
+static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	FactorData change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
+	FactorData last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	
 	double step = 3; // How much each iteration should alterate the gain
-	
-	if (iterations * step > 12)
-		cout << "WARNING: Using " << iterations << " iterations will hit the DSP EQ limit\n";
 	
 	for (int i = 0; i < iterations; i++) {
 		// Set EQ based on which iteration we're in
@@ -484,7 +478,7 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 			WavReader::read(filename, data);
 			
 			for (size_t j = 0; j < speaker_ips.size(); j++) {
-				double sound_sec = static_cast<double>(idle + j * (play + idle)) + 0.4;
+				double sound_sec = static_cast<double>(idle + j * (play + idle)) + 0.5;
 				size_t sound_start = lround(sound_sec * 48000.0);
 				
 				// Calculate FFT for 9 band as well
@@ -522,28 +516,80 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 		}
 	}
 	
+	return change_factors;
+}
+
+double calculateSD(const vector<double>& data) {
+	double sum = 0;
+	double mean = 0;
+	double std = 0;
+	
+	for (auto& value : data)
+		sum += value;
+		
+	mean = sum / data.size();
+	
+	for (auto& value : data)
+		std += pow(value - mean, 2);
+		
+	return sqrt(std / data.size());	
+}
+
+static void printFactorData(const vector<FactorData>& data, const vector<string>& mic_ips, const vector<string>& speaker_ips) {
+	vector<double> final_factors = vector<double>(DSP_MAX_BANDS, 0);
+	vector<vector<double>> std_dev = vector<vector<double>>(DSP_MAX_BANDS, vector<double>());
+	
 	// Print all data
-	for (size_t i = 0; i < change_factors.size(); i++) {
-		cout << "Microphone " << mic_ips.at(i) << ":\n";
-		auto& speakers = change_factors.at(i);
-		
-		for (size_t j = 0; j < speakers.size(); j++) {
-			cout << "Speaker " << speaker_ips.at(j) << ":\n";
-			auto& factors = speakers.at(j);
+	for (auto& change_factors : data) {
+		for (size_t i = 0; i < change_factors.size(); i++) {
+			cout << "Microphone " << mic_ips.at(i) << ":\n";
+			auto& speakers = change_factors.at(i);
 			
-			for (size_t k = 0; k < factors.size(); k++) {
-				cout << "Factor " << k * step << " dB -> " << (k + 1) * step << " dB:\t";
-				auto& eq_step = factors.at(k);
+			for (size_t j = 0; j < speakers.size(); j++) {
+				cout << "Speaker " << speaker_ips.at(j) << ":\n";
+				auto& factors = speakers.at(j);
 				
-				for (size_t l = 0; l < eq_step.size(); l++)
-					printf("%02lf\t", eq_step.at(l));
+				for (size_t k = 0; k < factors.size(); k++) {
+					cout << "Factor " << k * 3 << " dB -> " << (k + 1) * 3 << " dB:\t";
+					auto& eq_step = factors.at(k);
 					
-				cout << endl;
+					for (size_t l = 0; l < eq_step.size(); l++) {
+						final_factors.at(l) += eq_step.at(l);
+						std_dev.at(l).push_back(eq_step.at(l));
+						printf("%02lf\t", eq_step.at(l));
+					}
+						
+					cout << endl;
+				}
 			}
+			
+			cout << endl;
 		}
-		
-		cout << endl;
 	}
+	
+	vector<double> deviation;
+	
+	for (int i = 0; i < DSP_MAX_BANDS; i++) {
+		auto std_avk = calculateSD(std_dev.at(i));
+		
+		deviation.push_back(std_avk);
+	}
+	
+	double general_factor = 0;
+	
+	// Normalize to sum
+	cout << "Final factors:\n";
+	for (size_t i = 0; i < final_factors.size(); i++) {
+		auto& factor = final_factors.at(i);
+		factor /= (data.size() * 3 * speaker_ips.size());
+		
+		cout << "Frequency " << g_frequencies.at(i) << "\t " << factor << "\t dev " << deviation.at(i) << endl;
+		general_factor += factor;
+	}
+	
+	general_factor /= final_factors.size();
+	
+	cout << "GENERAL FACTOR: " << general_factor << endl;
 }
 
 static void runTestSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, const string& filename) {
@@ -588,17 +634,29 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Find correction factor
-	if (true /* Use some switch later on, let's calibrate every time for now */) {
-		findCorrectionFactor(speaker_ips, mic_ips, iterations);
+	if (false /* Use some switch later on, let's calibrate every time for now */) {
+		vector<FactorData> factor_data;
 		
-		// Set test settings again
-		setTestSpeakerSettings(all_ips);
+		for (int i = 0; i < iterations; i++) {
+			factor_data.push_back(findCorrectionFactor(speaker_ips, mic_ips, 4));
+			
+			// Set test settings again
+			setTestSpeakerSettings(all_ips);
+			
+			// Set test DSP gain again
+			setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
+			
+			cout << "Factor data for iteration " << (i + 1) << endl;
+			printFactorData({ factor_data.back() }, mic_ips, speaker_ips);
+		}
 		
-		// Set test DSP gain again
-		setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
+		cout << "Factor data for all iterations\n";
+		printFactorData(factor_data, mic_ips, speaker_ips);
 	}
 	
-	// TODO: Check sound image using white noise before trying to EQ
+	// Play white noise from all speakers to check sound image & collect the recordings
+	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
+	Base::system().getRecordings(mic_ips);
 	
 	// Run frequency responses
 	runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
@@ -622,7 +680,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		vector<vector<double>> new_eqs;
 		
 		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.4;
+			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.5;
 			size_t sound_start = lround(sound_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
