@@ -25,7 +25,8 @@ enum {
 enum {
 	TYPE_BEST_EQ,
 	TYPE_NEXT_EQ,
-	TYPE_FLAT_EQ
+	TYPE_FLAT_EQ,
+	TYPE_FACTOR_EQ
 };
 
 // We're not multithreading anyway
@@ -361,7 +362,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
 				break;
 				
-			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -18;
+			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -42;
 				break;
 		}
 		
@@ -404,7 +405,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 				double weight = linear_energy / total_linear_energy.at(k).at(i);
 				
 				// Get EQ at frequency j
-				double wanted_eq = eqs.at(i).at(k).at(j);
+				double wanted_eq = eqs.at(j).at(k).at(i);
 				
 				// Sk[i] += weight * Mj[i]
 				final_eqs.at(k).at(i) += weight * wanted_eq;
@@ -445,6 +446,9 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 	Test different levels of dB until we find a common factor
 */
 static void findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	// Set to low dB DSP gain
+	//setSpeakersEQ(speaker_ips, TYPE_FACTOR_EQ);
+	
 	vector<vector<vector<vector<double>>>> change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	vector<vector<vector<vector<double>>>> last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	
@@ -484,7 +488,7 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 				size_t sound_start = lround(sound_sec * 48000.0);
 				
 				// Calculate FFT for 9 band as well
-				auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 2));
+				auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
 				vector<double> dbs;
 				
 				for (auto& db_linear : db_linears) {
@@ -492,6 +496,10 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 					
 					dbs.push_back(db);
 				}
+				
+				cout << "Microphone (" << mic_ips.at(k) << ") gets from " << speaker_ips.at(j) << ":\n";
+				for (size_t z = 0; z < dbs.size(); z++)
+					cout << "Frequency " << g_frequencies.at(z) << "\t " << dbs.at(z) << " dB\n";
 				
 				if (!last_dbs.at(k).at(j).empty()) {
 					// Calculate new factors based on last results in last_dbs
@@ -524,11 +532,11 @@ static void findCorrectionFactor(const vector<string>& speaker_ips, const vector
 			auto& factors = speakers.at(j);
 			
 			for (size_t k = 0; k < factors.size(); k++) {
-				cout << "Factor " << k * step << ":\t";
+				cout << "Factor " << k * step << " dB -> " << (k + 1) * step << " dB:\t";
 				auto& eq_step = factors.at(k);
 				
 				for (size_t l = 0; l < eq_step.size(); l++)
-					cout << eq_step.at(l) << "\t";
+					printf("%02lf\t", eq_step.at(l));
 					
 				cout << endl;
 			}
@@ -618,7 +626,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			size_t sound_start = lround(sound_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
-			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 2));
+			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
 			vector<double> dbs;
 			
 			for (auto& db_linear : db_linears) {
