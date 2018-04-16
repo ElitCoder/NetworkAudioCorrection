@@ -105,7 +105,7 @@ static void handle(Connection& connection, Packet& input_packet) {
 			vector<string> speakers;
 			vector<string> mics;
 			
-			int iterations = input_packet.getInt();
+			bool factor_calibration = input_packet.getBool();
 			int num_speakers = input_packet.getInt();
 			int num_mics = input_packet.getInt();
 			
@@ -115,7 +115,7 @@ static void handle(Connection& connection, Packet& input_packet) {
 			for (int i = 0; i < num_mics; i++)
 				mics.push_back(input_packet.getString());
 
-			Handle::checkSoundImage(speakers, mics, iterations);
+			Handle::checkSoundImage(speakers, mics, factor_calibration);
 			
 			break;
 		}

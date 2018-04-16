@@ -153,10 +153,10 @@ void speakersOnline() {
 	cout << endl;
 }
 
-Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, int num_iterations) {
+Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, bool factor_calibration) {
 	Packet packet;
 	packet.addHeader(PACKET_CHECK_SOUND_IMAGE);
-	packet.addInt(num_iterations);
+	packet.addBool(factor_calibration);
 	packet.addInt(speakers.size());
 	packet.addInt(mics.size());
 	
@@ -171,34 +171,14 @@ Packet createSoundImage(const vector<string>& speakers, const vector<string>& mi
 }
 
 void soundImage() {
-	cout << "Iterations: ";
+	char answer;
+	cout << "Should factor calibration run? (Y/N): ";
+	cin >> answer;
 	
-	int iterations;
-	cin >> iterations;
-	
-	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, iterations));
-	
-	for (int i = 0; i < iterations; i++) {
-		cout << "Running iteration\t " << (i + 1) << " of\t" << iterations << "\t" << flush;
-		auto answer = g_network->waitForIncomingPacket();
-		answer.getByte();
-		cout << "done\n";
-		
-		for (size_t j = 0; j < g_external_microphones.size(); j++) {
-			auto score = answer.getFloat();
-			
-			cout << "Microphone (" << g_external_microphones.at(j) << ") score: " << score << endl;
-		}
-		
-		auto final_score = answer.getFloat();
-		
-		cout << "Final score: " << final_score << endl;
-	}
-	
-	// Accept createSoundImage packet
+	cout << "\nRunning sound image correction...\t" << flush;
+	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, answer == 'Y'));
 	g_network->waitForIncomingPacket();
-	
-	cout << "Best EQ was set at all speakers\n";
+	cout << "done\n\n";
 }
 
 Packet createBestEQ(const vector<string>& speakers, const vector<string>& mics) {

@@ -617,7 +617,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration) {
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
 	
@@ -635,10 +635,10 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Find correction factor
-	if (false /* Use some switch later on, let's calibrate every time for now */) {
+	if (factor_calibration /* Use some switch later on, let's calibrate every time for now */) {
 		vector<FactorData> factor_data;
 		
-		for (int i = 0; i < iterations; i++) {
+		for (int i = 0; i < 25; i++) {
 			factor_data.push_back(findCorrectionFactor(speaker_ips, mic_ips, 4));
 			
 			// Set test settings again
