@@ -42,6 +42,7 @@ static vector<string> g_frequencies = {	"63",
 										"16000" };
 
 // User specific EQ (on top of flat)
+//static vector<double> g_normalization_profile = { 8, -2, 2, -4, 2, -2, -4, 0, 6 };
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static double g_target_mean = -45;

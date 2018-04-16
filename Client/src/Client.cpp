@@ -25,11 +25,11 @@ static NetworkCommunication* g_network;
 	172.25.11.47
 	172.25.12.99
 	172.25.11.186
-	172.25.15.12
+	172.25.15.12 <- fucked?
 */
 
 // Speakers
-static vector<string> g_ips = { "172.25.9.38", "172.25.13.200" };
+static vector<string> g_ips = { "172.25.13.200" };
 // External microphones
 static vector<string> g_external_microphones = { "172.25.15.233" };
 
