@@ -100,6 +100,9 @@ double Speaker::getBestScore() const {
 }
 
 vector<double> Speaker::getBestEQ() {
+	if (current_best_eq_.empty())
+		return vector<double>(DSP_MAX_BANDS, 0);
+		
 	return current_best_eq_;
 }
 
@@ -117,6 +120,8 @@ double Speaker::getBestVolume() const {
 }
 
 void Speaker::setBestVolume() {
+	cout << "Speaker::setBestVolume() = " << best_speaker_volume_ << endl;
+	
 	volume_ = best_speaker_volume_;
 }
 

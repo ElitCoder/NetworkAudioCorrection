@@ -25,7 +25,8 @@ enum {
 enum {
 	TYPE_BEST_EQ,
 	TYPE_NEXT_EQ,
-	TYPE_FLAT_EQ
+	TYPE_FLAT_EQ,
+	TYPE_WHITE_EQ	// For testing white noise, which should be -12 since EQ tops at 12 dB
 };
 
 // We're not multithreading anyway
@@ -46,7 +47,7 @@ static vector<string> g_frequencies = {	"63",
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static double g_target_mean = -45;
-vector<double> g_speaker_dsp_factor = { 0.856162, 0.971586, 0.980661, 0.9969, 0.991612, 0.966417, 0.985798, 0.952646, 1.11358 }; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor = { 0.871347, 0.961158, 0.991897, 1.02075, 0.980886, 0.96774, 0.96639, 0.968365, 0.986575 }; // Which factor the EQ's should be multiplied with to get the right result
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -327,7 +328,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		vector<double> eq;
 		
 		switch (type) {
-			case TYPE_BEST_EQ: {
+			case TYPE_BEST_EQ: case TYPE_WHITE_EQ: {
 				eq = speaker->getBestEQ();
 				speaker->setBestVolume();
 				
@@ -364,6 +365,9 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 				break;
 				
 			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -21; // More headroom for increasing the volume
+				break;
+				
+			case TYPE_WHITE_EQ: dsp_gain = -12; // For testing flat & best EQ
 				break;
 		}
 		
@@ -447,6 +451,10 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 	Test different levels of dB until we find a common factor
 */
 static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
+	// We don't want the EQ to be normalized when running factor testing
+	auto save_current_factors = g_speaker_dsp_factor;
+	g_speaker_dsp_factor = vector<double>(DSP_MAX_BANDS, 1);
+	
 	FactorData change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	FactorData last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	
@@ -516,6 +524,9 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 			}
 		}
 	}
+	
+	// Load DSP factor settings again
+	g_speaker_dsp_factor = save_current_factors;
 	
 	return change_factors;
 }
@@ -617,6 +628,9 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
+// From NetworkCommunication
+string getTimestamp();
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration) {
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
@@ -628,24 +642,18 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
 	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", false);
 	
-	// Set test settings
-	setTestSpeakerSettings(all_ips);
-	
-	// Set test DSP gain
-	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
-	
 	// Find correction factor
 	if (factor_calibration /* Use some switch later on, let's calibrate every time for now */) {
 		vector<FactorData> factor_data;
 		
 		for (int i = 0; i < 25; i++) {
-			factor_data.push_back(findCorrectionFactor(speaker_ips, mic_ips, 4));
-			
 			// Set test settings again
 			setTestSpeakerSettings(all_ips);
 			
 			// Set test DSP gain again
 			setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
+			
+			factor_data.push_back(findCorrectionFactor(speaker_ips, mic_ips, 4));
 			
 			cout << "Factor data for iteration " << (i + 1) << endl;
 			printFactorData({ factor_data.back() }, mic_ips, speaker_ips);
@@ -655,9 +663,44 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		printFactorData(factor_data, mic_ips, speaker_ips);
 	}
 	
+	// Set test settings
+	setTestSpeakerSettings(all_ips);
+	
+	// Set test DSP gain
+	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
+	
+	// Set test white noise settings
+	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
+	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 	Base::system().getRecordings(mic_ips);
+	
+	auto timestamp = getTimestamp();
+	// Remove whitespace
+	replace(timestamp.begin(), timestamp.end(), ' ', '_');
+	// Remove ':'
+	replace(timestamp.begin(), timestamp.end(), ':', '_');
+	timestamp.pop_back();
+	timestamp += '/';
+	
+	// Move these white noise recordings to save folder (before)
+	if (!system(NULL)) {
+		cout << "WARNING: No shell available\n";
+	} else {
+		// Create folders for this data
+		string folder = "../save/white_noises/before/" + timestamp;
+		string mkdir = "mkdir " + folder;
+		string move = "cp results/cap* " + folder;
+		system(mkdir.c_str());
+		system(move.c_str());
+		
+		cout << "mkdir command: " << mkdir << endl;
+		cout << "move command: " << move << endl;
+	}
+	
+	// Set test DSP gain
+	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Run frequency responses
 	runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
@@ -728,12 +771,27 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
 	}
 		
-	// Propagate this EQ to the speakers
-	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
+	// Set test white noise settings
+	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 	Base::system().getRecordings(mic_ips);
+	
+	// Move these white noise recordings to save folder (after)
+	if (!system(NULL)) {
+		cout << "WARNING: No shell available\n";
+	} else {
+		// Create folders for this data
+		string folder = "../save/white_noises/after/" + timestamp;
+		string mkdir = "mkdir " + folder;
+		string move = "cp results/cap* " + folder;
+		system(mkdir.c_str());
+		system(move.c_str());
+		
+		cout << "mkdir command: " << mkdir << endl;
+		cout << "move command: " << move << endl;
+	}
 	
 	// TODO: Analyze data from white noise
 	// Divide every band using this?

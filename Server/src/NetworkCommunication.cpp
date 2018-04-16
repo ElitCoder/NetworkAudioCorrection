@@ -10,7 +10,7 @@
 
 using namespace std;
 
-static string getTimestamp() {
+string getTimestamp() {
 	time_t current_time = chrono::system_clock::to_time_t(chrono::system_clock::now());
 	
 	return ctime(&current_time);

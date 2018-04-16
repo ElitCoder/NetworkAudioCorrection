@@ -1,0 +1,11 @@
+Final factors:
+Frequency 63	 0.868963	 dev 0.251569
+Frequency 125	 0.9486	 dev 0.475516
+Frequency 250	 0.979014	 dev 0.13853
+Frequency 500	 0.976722	 dev 0.125729
+Frequency 1000	 0.981518	 dev 0.293674
+Frequency 2000	 0.964439	 dev 0.0814831
+Frequency 4000	 0.948562	 dev 0.106798
+Frequency 8000	 0.937689	 dev 0.323343
+Frequency 16000	 0.863736	 dev 1.60528
+GENERAL FACTOR: 0.941027
