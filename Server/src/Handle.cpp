@@ -364,10 +364,10 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_FLAT_EQ: dsp_gain = 0;
+			case TYPE_FLAT_EQ: dsp_gain = -6;
 				break;
 				
-			case TYPE_NEXT_EQ: dsp_gain = -9; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
+			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
 				break;
 				
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
