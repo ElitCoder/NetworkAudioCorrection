@@ -651,7 +651,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	if (factor_calibration /* Use some switch later on, let's calibrate every time for now */) {
 		vector<FactorData> factor_data;
 		
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 25; i++) {
 			// Set test settings again
 			setTestSpeakerSettings(all_ips);
 			
