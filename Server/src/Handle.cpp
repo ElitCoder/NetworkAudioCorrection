@@ -26,7 +26,6 @@ enum {
 	TYPE_BEST_EQ,
 	TYPE_NEXT_EQ,
 	TYPE_FLAT_EQ,
-	TYPE_WHITE_EQ	// For testing white noise, which should be -12 since EQ tops at 12 dB
 };
 
 // We're not multithreading anyway
@@ -319,18 +318,20 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 	vector<string> commands;
 	
 	// Wanted by best EQ
-	double highest_dsp_gain = INT_MIN;
+	double loudest_gain = INT_MIN;
 	
 	for (auto* speaker : speakers) {
-		if (speaker->getBestVolume() > highest_dsp_gain)
-			highest_dsp_gain = speaker->getBestVolume();
+		auto total = speaker->getBestVolume() + speaker->getLoudestBestEQ();
+		
+		if (total > loudest_gain)
+			loudest_gain = total;
 	}
 	
 	for (auto* speaker : speakers) {
 		vector<double> eq;
 		
 		switch (type) {
-			case TYPE_BEST_EQ: case TYPE_WHITE_EQ: {
+			case TYPE_BEST_EQ: {
 				eq = speaker->getBestEQ();
 				speaker->setBestVolume();
 				
@@ -363,13 +364,13 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			//case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
-			//	break;
-				
-			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -21; // More headroom for increasing the volume
+			case TYPE_FLAT_EQ: dsp_gain = 0;
 				break;
 				
-			case TYPE_WHITE_EQ: case TYPE_BEST_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - highest_dsp_gain); // For testing flat & best EQ
+			case TYPE_NEXT_EQ: dsp_gain = -9; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
+				break;
+				
+			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
 				break;
 		}
 		
@@ -674,7 +675,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Set test white noise settings
-	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
+	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
@@ -778,7 +779,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	}
 		
 	// Set test white noise settings
-	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
+	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
@@ -805,7 +806,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// i.e FFT and look at these frequency ranges
 	
 	// Reset mics & set best EQ
-	setBestEQ(speaker_ips, mic_ips);
+	//setBestEQ(speaker_ips, mic_ips);
+	resetEverything(mic_ips);
+	enableAudioSystem(all_ips);
 }
 
 void Handle::resetIPs(const vector<string>& ips) {

@@ -63,6 +63,7 @@ public:
 	double getBestVolume() const;
 	double getNextVolume() const;
 	double getBestScore() const;
+	double getLoudestBestEQ() const;
 	
 	// Mic getters
 	std::vector<double> getFrequencyResponseFrom(const std::string& ip) const;

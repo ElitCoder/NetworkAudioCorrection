@@ -56,6 +56,13 @@ vector<double> Speaker::getNextEQ() {
 	return correction_eq_;
 }
 
+double Speaker::getLoudestBestEQ() const {
+	if (current_best_eq_.empty())
+		return 0;
+		
+	return *max_element(current_best_eq_.begin(), current_best_eq_.end());	
+}
+
 template<class T>
 static T getMean(const vector<T>& container) {
 	double sum = 0;
