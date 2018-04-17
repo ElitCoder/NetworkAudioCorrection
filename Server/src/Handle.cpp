@@ -47,7 +47,7 @@ static vector<string> g_frequencies = {	"63",
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static double g_target_mean = -45;
-vector<double> g_speaker_dsp_factor = { 0.871347, 0.961158, 0.991897, 1.02075, 0.980886, 0.96774, 0.96639, 0.968365, 0.986575 }; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
