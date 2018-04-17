@@ -42,9 +42,10 @@ static vector<string> g_frequencies = {	"63",
 										"8000",
 										"16000" };
 
-// User specific EQ (on top of flat)
-//static vector<double> g_normalization_profile = { 8, -2, 2, -4, 2, -2, -4, 0, 6 };
+// Flat EQ
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+// Axis own music EQ with adjustments
+//static vector<double> g_normalization_profile = { 4, 2.5, 1, -1, -1.5, 0, 0, 0, 1 };
 
 static double g_target_mean = -45;
 vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
