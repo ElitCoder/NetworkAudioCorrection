@@ -369,7 +369,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -21; // More headroom for increasing the volume
 				break;
 				
-			case TYPE_WHITE_EQ: dsp_gain = -12; // For testing flat & best EQ
+			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - highest_dsp_gain); // For testing flat & best EQ
 				break;
 		}
 		
@@ -489,11 +489,13 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 			WavReader::read(filename, data);
 			
 			for (size_t j = 0; j < speaker_ips.size(); j++) {
-				double sound_sec = static_cast<double>(idle + j * (play + idle)) + 0.5;
-				size_t sound_start = lround(sound_sec * 48000.0);
+				double sound_start_sec = static_cast<double>(idle + j * (play + idle)) + 1;
+				double sound_stop_sec = sound_start_sec + play / 2.0;
+				size_t sound_start = lround(sound_start_sec * 48000.0);
+				size_t sound_stop = lround(sound_stop_sec * 48000.0);
 				
 				// Calculate FFT for 9 band as well
-				auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
+				auto db_linears = getFFT9(data, sound_start, sound_stop);
 				vector<double> dbs;
 				
 				for (auto& db_linear : db_linears) {
@@ -648,7 +650,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	if (factor_calibration /* Use some switch later on, let's calibrate every time for now */) {
 		vector<FactorData> factor_data;
 		
-		for (int i = 0; i < 25; i++) {
+		for (int i = 0; i < 5; i++) {
 			// Set test settings again
 			setTestSpeakerSettings(all_ips);
 			
@@ -726,11 +728,13 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		vector<vector<double>> new_eqs;
 		
 		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			double sound_sec = static_cast<double>(idle + i * (play + idle)) + 0.5;
-			size_t sound_start = lround(sound_sec * 48000.0);
+			double sound_start_sec = static_cast<double>(idle + i * (play + idle)) + 1;
+			double sound_stop_sec = sound_start_sec + play / 2.0;
+			size_t sound_start = lround(sound_start_sec * 48000.0);
+			size_t sound_stop = lround(sound_stop_sec * 48000.0);
 			
 			// Calculate FFT for 9 band as well
-			auto db_linears = getFFT9(data, sound_start, sound_start + (48000 / 3));
+			auto db_linears = getFFT9(data, sound_start, sound_stop);
 			vector<double> dbs;
 			
 			for (auto& db_linear : db_linears) {
