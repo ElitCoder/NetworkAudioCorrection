@@ -363,13 +363,13 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
-				break;
+			//case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - highest_dsp_gain;
+			//	break;
 				
 			case TYPE_NEXT_EQ: case TYPE_FLAT_EQ: dsp_gain = -21; // More headroom for increasing the volume
 				break;
 				
-			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - highest_dsp_gain); // For testing flat & best EQ
+			case TYPE_WHITE_EQ: case TYPE_BEST_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - highest_dsp_gain); // For testing flat & best EQ
 				break;
 		}
 		
