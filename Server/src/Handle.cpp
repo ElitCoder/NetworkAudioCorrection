@@ -320,12 +320,17 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 	
 	// Wanted by best EQ
 	double loudest_gain = INT_MIN;
+	double loudest_volume = INT_MIN;
 	
 	for (auto* speaker : speakers) {
 		auto total = speaker->getBestVolume() + speaker->getLoudestBestEQ();
+		auto volume = speaker->getBestVolume();
 		
 		if (total > loudest_gain)
 			loudest_gain = total;
+			
+		if (volume > loudest_volume)
+			loudest_volume = volume;
 	}
 	
 	for (auto* speaker : speakers) {
@@ -372,7 +377,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 				break;
 				
 			// We don't know which limits the speaker will set during calibration, so safe it and say it will max the EQ (at -12)
-			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_gain);
+			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_volume);
 				break;
 				
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
