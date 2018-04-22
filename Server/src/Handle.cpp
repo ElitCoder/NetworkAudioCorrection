@@ -8,6 +8,7 @@
 #include "Speaker.h"
 #include "System.h"
 #include "Config.h"
+#include "Analyze.h"
 
 #include <iostream>
 #include <cmath>
@@ -124,7 +125,7 @@ void resetEverything(const vector<string>& ips) {
 static void setTestSpeakerSettings(const vector<string>& ips) {
 	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 2; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
@@ -677,6 +678,28 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
+static void getCalibrationScore(const vector<string>& mic_ips) {
+	for (auto& mic_ip : mic_ips) {
+		string filename = "results/cap" + mic_ip + ".wav";
+		
+		vector<short> data;
+		WavReader::read(filename, data);
+		
+		auto idle = Base::config().get<int>("idle_time");
+		auto play = Base::config().get<int>("play_time");
+		
+		double sound_start_sec = static_cast<double>(idle) + 1;
+		double sound_stop_sec = sound_start_sec + play / 2.0;
+		size_t sound_start = lround(sound_start_sec * 48000.0);
+		size_t sound_stop = lround(sound_stop_sec * 48000.0);
+		
+		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
+		
+		auto fft_output = nac::fft(sound);
+		auto band_dbs = nac::calculate(fft_output);
+	}
+}
+
 // From NetworkCommunication.cpp
 extern string getTimestamp();
 
@@ -725,6 +748,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 	Base::system().getRecordings(mic_ips);
 	
+	// See calibration score before calibrating
+	getCalibrationScore(mic_ips);
+	
 	auto timestamp = getTimestamp();
 	// Remove whitespace
 	replace(timestamp.begin(), timestamp.end(), ' ', '_');
@@ -752,6 +778,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	auto flat_level_db = getSoundLevel(mic_ips);
 	
 	cout << "White noise sound level: " << flat_level_db << endl;
+	cout << "Setting target mean to " << flat_level_db << endl;
+	
+	g_target_mean = flat_level_db;
 	
 	// Set test DSP gain
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
@@ -833,6 +862,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 	Base::system().getRecordings(mic_ips);
+	
+	// See calibration score before calibrating
+	getCalibrationScore(mic_ips);
 	
 	// Move these white noise recordings to save folder (after)
 	if (!system(NULL)) {

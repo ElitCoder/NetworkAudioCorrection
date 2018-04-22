@@ -3,7 +3,7 @@ OBJ_FILES	:= $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 
 CC_FLAGS	:= -std=c++14 -Wall -Wextra -pedantic-errors
 CC_FLAGS	+= -fopenmp
-LD_LIBS		:= -lnessh -lcurl -lcurlpp -lpthread -fopenmp
+LD_LIBS		:= -fopenmp -lfftw3 -lnessh -lcurl -lcurlpp -lpthread
 
 EXECUTABLE	:= Server
 
