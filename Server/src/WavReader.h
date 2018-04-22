@@ -1,3 +1,4 @@
+#pragma once
 #ifndef WAVREADER_H
 #define WAVREADER_H
 

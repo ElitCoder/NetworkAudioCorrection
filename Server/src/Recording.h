@@ -1,3 +1,4 @@
+#pragma once
 #ifndef RECORDING_H
 #define RECORDING_H
 

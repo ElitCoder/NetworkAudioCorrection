@@ -1,10 +1,11 @@
+#pragma once
 #ifndef PACKET_H
 #define PACKET_H
 
-#include "PartialPacket.h"
-
 #include <string>
 #include <vector>
+
+class PartialPacket;
 
 class Packet {
 public:

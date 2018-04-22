@@ -1,5 +1,6 @@
 #include "Localization3D.h"
 #include "Base.h"
+#include "Config.h"
 
 #include <cmath>
 #include <iostream>

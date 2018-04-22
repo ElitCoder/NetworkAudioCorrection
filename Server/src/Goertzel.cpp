@@ -2,6 +2,7 @@
 #include "Recording.h"
 #include "WavReader.h"
 #include "Base.h"
+#include "Config.h"
 
 #include <iostream>
 #include <cmath>

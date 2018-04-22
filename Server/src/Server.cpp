@@ -1,6 +1,9 @@
 #include "NetworkCommunication.h"
 #include "Handle.h"
 #include "Base.h"
+#include "Packet.h"
+#include "Connection.h"
+#include "Config.h"
 
 #include <iostream>
 #include <algorithm>

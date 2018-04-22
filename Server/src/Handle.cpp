@@ -4,6 +4,10 @@
 #include "Goertzel.h"
 #include "Base.h"
 #include "Packet.h"
+#include "Connection.h"
+#include "Speaker.h"
+#include "System.h"
+#include "Config.h"
 
 #include <iostream>
 #include <cmath>
@@ -48,7 +52,8 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 //static vector<double> g_normalization_profile = { 4, 2.5, 1, -1, -1.5, 0, 0, 0, 1 };
 
 static double g_target_mean = -45;
-vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
+//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -619,6 +624,35 @@ static void printFactorData(const vector<FactorData>& data, const vector<string>
 	cout << "GENERAL FACTOR: " << general_factor << endl;
 }
 
+// From Recording.cpp
+extern short getRMS(const vector<short>&, size_t, size_t);
+
+static double getSoundLevel(const vector<string>& mic_ips) {
+	double total_db = 0;
+	
+	for (auto& mic_ip : mic_ips) {
+		string filename = "results/cap" + mic_ip + ".wav";
+		
+		vector<short> data;
+		WavReader::read(filename, data);
+		
+		auto idle = Base::config().get<int>("idle_time");
+		auto play = Base::config().get<int>("play_time");
+		
+		double sound_start_sec = static_cast<double>(idle) + 1;
+		double sound_stop_sec = sound_start_sec + play / 2.0;
+		size_t sound_start = lround(sound_start_sec * 48000.0);
+		size_t sound_stop = lround(sound_stop_sec * 48000.0);
+		
+		auto sound_level_linear = getRMS(data, sound_start, sound_stop);
+		auto sound_level_db = 20.0 * log10(sound_level_linear / (double)SHRT_MAX);
+		
+		total_db += sound_level_db;
+	}
+	
+	return total_db / mic_ips.size();
+}
+
 static void runTestSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, const string& filename) {
 	vector<string> scripts;
 	
@@ -643,8 +677,8 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-// From NetworkCommunication
-string getTimestamp();
+// From NetworkCommunication.cpp
+extern string getTimestamp();
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration) {
 	vector<string> all_ips(speaker_ips);
@@ -713,6 +747,11 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		cout << "mkdir command: " << mkdir << endl;
 		cout << "move command: " << move << endl;
 	}
+	
+	// Get sound level from white noise
+	auto flat_level_db = getSoundLevel(mic_ips);
+	
+	cout << "White noise sound level: " << flat_level_db << endl;
 	
 	// Set test DSP gain
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);

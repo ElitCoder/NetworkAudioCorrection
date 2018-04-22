@@ -39,7 +39,7 @@ double Recording::getDistance(int id) {
 	return 0;		
 }
 
-static short getRMS(const vector<short>& data, size_t start, size_t end) {
+short getRMS(const vector<short>& data, size_t start, size_t end) {
 	unsigned long long sum = 0;
 	
 	for (size_t i = start; i < end; i++)

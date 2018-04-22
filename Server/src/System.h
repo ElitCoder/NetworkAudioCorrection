@@ -1,9 +1,11 @@
+#pragma once
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include "Speaker.h"
 #include "Handle.h"
+#include "Speaker.h"
 
+// libnessh
 #include <libnessh/SSHMaster.h>
 
 #include <vector>

@@ -1,4 +1,7 @@
 #include "Base.h"
+#include "System.h"
+#include "Config.h"
+#include "NetworkCommunication.h"
 
 System Base::system_;
 Config Base::config_;

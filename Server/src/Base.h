@@ -1,9 +1,10 @@
+#pragma once
 #ifndef BASE_H
 #define BASE_H
 
-#include "System.h"
-#include "Config.h"
-#include "NetworkCommunication.h"
+class System;
+class Config;
+class NetworkCommunication;
 
 class Base {
 public:

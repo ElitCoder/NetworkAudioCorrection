@@ -1,3 +1,4 @@
+#pragma once
 #ifndef GOERTZEL_H
 #define GOERTZEL_H
 

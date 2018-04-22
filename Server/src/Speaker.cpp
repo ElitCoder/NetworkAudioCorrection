@@ -74,19 +74,25 @@ static T getMean(const vector<T>& container) {
 }
 
 static double correctMaxEQ(vector<double>& eq) {
-	double mean_db = getMean(eq);
+	double total_mean_change = 0;
 	
-	for (auto& setting : eq)
-		setting -= mean_db;
-	
-	for (auto& setting : eq) {
-		if (setting < DSP_MIN_EQ)
-			setting = DSP_MIN_EQ;
-		else if (setting > DSP_MAX_EQ)
-			setting = DSP_MAX_EQ;
+	for (int i = 0; i < 1000; i++) {
+		double mean_db = getMean(eq);
+		
+		for (auto& setting : eq)
+			setting -= mean_db;
+		
+		for (auto& setting : eq) {
+			if (setting < DSP_MIN_EQ)
+				setting = DSP_MIN_EQ;
+			else if (setting > DSP_MAX_EQ)
+				setting = DSP_MAX_EQ;
+		}
+		
+		total_mean_change += mean_db;
 	}
 	
-	return mean_db;
+	return total_mean_change;
 }
 
 static void printEQ(const string& ip, const vector<double>& eq, const string& name) {

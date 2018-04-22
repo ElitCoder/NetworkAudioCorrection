@@ -1,4 +1,5 @@
 #include "System.h"
+#include "Speaker.h"
 
 // libcurlpp
 #include <curlpp/cURLpp.hpp>

@@ -1,3 +1,4 @@
+#pragma once
 #ifndef PARTIAL_PACKET_H
 #define PARTIAL_PACKET_H
 

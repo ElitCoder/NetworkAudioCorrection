@@ -1,4 +1,5 @@
 #include "Connection.h"
+#include "PartialPacket.h"
 
 #include <fcntl.h>
 #include <netinet/tcp.h>

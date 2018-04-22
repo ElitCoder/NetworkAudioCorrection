@@ -1,4 +1,5 @@
 #include "Packet.h"
+#include "PartialPacket.h"
 
 #include <array>
 #include <iostream>
