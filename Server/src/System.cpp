@@ -24,12 +24,14 @@ static void enableSSH(const string& ip) {
 	request.setOpt(curlpp::options::UserPwd(string("root:pass")));
 	request.setOpt(curlpp::options::HttpAuth(CURLAUTH_ANY));
 	request.setOpt(curlpp::options::WriteStream(&stream));
-	request.setOpt(curlpp::options::Timeout(60));
+	request.setOpt(curlpp::options::Timeout(10));
 	
 	try {
 		request.perform();
 	} catch (...) {
 		// GET request failed
+		cout << "Warning: request timed out in trying to set SSH enable\n";
+		
 		return;
 	}
 	

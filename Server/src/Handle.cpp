@@ -26,6 +26,7 @@ enum {
 	TYPE_BEST_EQ,
 	TYPE_NEXT_EQ,
 	TYPE_FLAT_EQ,
+	TYPE_WHITE_EQ
 };
 
 // We're not multithreading anyway
@@ -331,7 +332,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		vector<double> eq;
 		
 		switch (type) {
-			case TYPE_BEST_EQ: {
+			case TYPE_BEST_EQ: case TYPE_WHITE_EQ: {
 				eq = speaker->getBestEQ();
 				speaker->setBestVolume();
 				
@@ -368,6 +369,10 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 				break;
 				
 			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
+				break;
+				
+			// We don't know which limits the speaker will set during calibration, so safe it and say it will max the EQ (at -12)
+			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_gain);
 				break;
 				
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
@@ -675,7 +680,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Set test white noise settings
-	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
+	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
@@ -779,7 +784,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	}
 		
 	// Set test white noise settings
-	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
+	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	
 	// Play white noise from all speakers to check sound image & collect the recordings
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
@@ -808,6 +813,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Reset mics & set best EQ
 	//setBestEQ(speaker_ips, mic_ips);
 	resetEverything(mic_ips);
+	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	enableAudioSystem(all_ips);
 }
 
