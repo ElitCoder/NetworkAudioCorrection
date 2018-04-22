@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # build dependencies
-sudo apt-get update && sudo apt-get install g++ libcurl4-openssl-dev
+sudo apt-get update && sudo apt-get install g++ libcurl4-openssl-dev libfftw3-dev
 
 # install nessh
 git clone https://github.com/ElitCoder/nessh.git
