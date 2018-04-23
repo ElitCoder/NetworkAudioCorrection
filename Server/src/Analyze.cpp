@@ -33,6 +33,16 @@ static const vector<double> eq_limits = {	38.936,		101.936,
 											9888.544,	25888.544	};										
 #endif
 
+static vector<string> g_frequencies =	{	"63",
+											"125",
+											"250",
+											"500",
+											"1000",
+											"2000",
+											"4000",
+											"8000",
+											"16000"	};
+
 template<class T>
 static T mean(const vector<T>& container) {
 	double sum = 0;
@@ -60,6 +70,7 @@ static double calculateSD(const vector<double>& data) {
 }
 
 static int getBandIndex(double frequency) {
+	// TODO: Microphone/speaker should be profile inputs to the program
 	// Mic can't pick up this anyway
 	if (frequency < 20 || frequency > 20000)
 		return -1;
@@ -96,8 +107,8 @@ namespace nac {
 		vector<double> v;
 
 		for (int i = 0; i <= ((N/2)-1); i++)
-			//v.push_back((20 * log(sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]))) / N);	// dB
-			v.push_back(sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]) / N);				// linear
+			// Linear energy
+			v.push_back(sqrt(out[i][0] * out[i][0] + out[i][1] * out[i][1]) / N);
 		
 		vector<double> frequencies;
 		vector<double> magnitudes;
@@ -118,7 +129,6 @@ namespace nac {
 		auto& magnitudes = input.second;
 		
 		vector<double> band_energy(band_limits.size() / 2, 0);
-		vector<double> band_nums(band_limits.size() / 2, 0);
 		
 		// Analyze bands
 		for (size_t i = 0; i < frequencies.size(); i++) {
@@ -128,29 +138,25 @@ namespace nac {
 			if (index < 0)
 				continue;
 			
-			band_energy.at(index) += magnitudes.at(i);	
-			band_nums.at(index)++;
-		}
-		
-		for (size_t i = 0; i < band_energy.size(); i++) {
-			band_energy.at(i) /= band_nums.at(i);
-			
-			cout << "Energy band " << i << "\t " << band_energy.at(i) << endl;
+			band_energy.at(index) += magnitudes.at(i);
 		}
 		
 		auto std_dev = calculateSD(band_energy);
-		auto band_mean = mean(band_energy);
-		vector<double> boost;
+		vector<double> gains;
 	
-		for (auto& energy : band_energy) {
-			double gain = 20 * log10(energy / band_mean);
+		for (size_t i = 0; i < band_energy.size(); i++) {
+			auto& energy = band_energy.at(i);
+			double gain = 20 * log10(energy / (double)SHRT_MAX);
 			
-			cout << "Gain: " << gain << endl;
-			boost.push_back(gain * (-1));
+			cout << "Gain " << g_frequencies.at(i) << "\t: " << gain << endl;
+			gains.push_back(gain);
 		}
 		
-		cout << "Standard deviation: " << std_dev << endl;
+		auto std_dev_db = calculateSD(gains);
 		
-		return { band_energy, boost };
+		cout << "Standard deviation: " << std_dev << endl;
+		cout << "Standard deviation dB " << std_dev_db << endl;
+		
+		return { band_energy, gains };
 	}
 }

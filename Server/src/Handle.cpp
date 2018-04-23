@@ -37,15 +37,15 @@ enum {
 // We're not multithreading anyway
 Connection* g_current_connection = nullptr;
 
-static vector<string> g_frequencies = {	"63",
-										"125",
-										"250",
-										"500",
-										"1000",
-										"2000",
-										"4000",
-										"8000",
-										"16000" };
+static vector<string> g_frequencies =	{	"63",
+											"125",
+											"250",
+											"500",
+											"1000",
+											"2000",
+											"4000",
+											"8000",
+											"16000"	};
 
 // Flat EQ
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -53,8 +53,8 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 //static vector<double> g_normalization_profile = { 6, 3, 1, -1, -1.5, 0, 0, 0, 3 };
 
 static double g_target_mean = -45;
-vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
-//vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
+//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -376,7 +376,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_FLAT_EQ: dsp_gain = -6;
+			case TYPE_FLAT_EQ: dsp_gain = -12;
 				break;
 				
 			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
@@ -396,7 +396,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 	Base::system().runScript(speaker_ips, commands);
 }
 
-static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const vector<string>& mic_ips, const MicWantedEQ& eqs, bool is_linear) {
+static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const vector<string>& mic_ips, const MicWantedEQ& eqs) {
 	// Initialize to 0 EQ
 	vector<vector<double>> final_eqs(eqs.front().size(), vector<double>(DSP_MAX_BANDS, 0));
 	vector<vector<double>> total_linear_energy = vector<vector<double>>(speaker_ips.size(), vector<double>(DSP_MAX_BANDS, 0));
@@ -409,7 +409,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = is_linear ? response : (pow(10, response / 20) * (double)SHRT_MAX);
+				double linear_energy = pow(10, response / 20) * (double)SHRT_MAX;
 				
 				total_linear_energy.at(k).at(i) += linear_energy;
 			}
@@ -424,7 +424,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = is_linear ? response : (pow(10, response / 20) * (double)SHRT_MAX);
+				double linear_energy = pow(10, response / 20) * (double)SHRT_MAX;
 				
 				double weight = linear_energy / total_linear_energy.at(k).at(i);
 				
@@ -706,7 +706,7 @@ static vector<BandOutput> getCalibrationScore(const vector<string>& mic_ips) {
 	return boosts;
 }
 
-static BandOutput getWhiteEQ(const vector<short>& data, size_t sound_start, size_t sound_stop) {
+static BandOutput getPinkResponse(const vector<short>& data, size_t sound_start, size_t sound_stop) {
 	vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 	
 	return nac::calculate(nac::fft(sound));
@@ -764,11 +764,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	auto boosts = getCalibrationScore(mic_ips);
-	
-	// Add user profile
-	//for (int i = 0; i < DSP_MAX_BANDS; i++)
-	//	boosts.front().at(i) += g_normalization_profile.at(i);
+	getCalibrationScore(mic_ips);
 	
 	auto timestamp = getTimestamp();
 	// Remove whitespace
@@ -834,23 +830,22 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			size_t sound_start = lround(sound_start_sec * 48000.0);
 			size_t sound_stop = lround(sound_stop_sec * 48000.0);
 			
-			auto sound_linears = getWhiteEQ(data, sound_start, sound_stop);
-			auto& energy = sound_linears.first;
-			auto& eq_change = sound_linears.second;
-			
-			new_eqs.push_back(eq_change);
-			
-			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), energy);
-			
-			#if 0
-			// Calculate FFT for 9 band as well
-			auto db_linears = getFFT9(data, sound_start, sound_stop);
 			vector<double> dbs;
 			
-			for (auto& db_linear : db_linears) {
-				double db = 20 * log10(db_linear / (double)SHRT_MAX);
+			if (run_white_noise) {
+				auto sound = getPinkResponse(data, sound_start, sound_stop);
+				// TODO: Do something smart here, analyze the energies and see how the Q will affect which frequencies get boosted and so on
+				//auto& energy = sound.first;
+				dbs = sound.second;
+			} else {
+				// Calculate FFT for 9 band as well
+				auto db_linears = getFFT9(data, sound_start, sound_stop);
 				
-				dbs.push_back(db);
+				for (auto& db_linear : db_linears) {
+					double db = 20 * log10(db_linear / (double)SHRT_MAX);
+					
+					dbs.push_back(db);
+				}
 			}
 			
 			// How much does this microphone get per frequency?
@@ -869,7 +864,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			
 			// DBs is vector of the current speaker with all its' frequency dBs
 			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
-			#endif
 		}
 		
 		// Add this to further calculations when we have all the information
@@ -877,7 +871,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	}
 	
 	// Weight data against profile and microphones
-	auto final_eqs = weightEQs(speaker_ips, mic_ips, wanted_eqs, run_white_noise);
+	auto final_eqs = weightEQs(speaker_ips, mic_ips, wanted_eqs);
 	
 	// Set new EQs
 	for (size_t j = 0; j < speaker_ips.size(); j++) {
@@ -888,15 +882,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
 	}
 	
-	#if 0
-	// Used for white noise DSP correction
-	// Add new EQ
-	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(boosts.front(), 0);
-	
-	// Say that this EQ is epic
-	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
-	#endif
-	
 	// Set test white noise settings
 	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	
@@ -905,23 +890,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	auto done_boosts = getCalibrationScore(mic_ips);
-	
-	#if 0
-	for (size_t i = 0; i < done_boosts.size(); i++) {
-		auto& old = boosts.at(i);
-		auto& current = done_boosts.at(i);
-		
-		for (size_t j = 0; j < current.size(); j++) {
-			auto& old_value = old.at(j);
-			auto& current_value = current.at(j);
-			
-			cout << abs(current_value - old_value) / old_value << " ";
-		}
-		
-		cout << endl;
-	}
-	#endif
+	getCalibrationScore(mic_ips);
 	
 	// Move these white noise recordings to save folder (after)
 	if (!system(NULL)) {
@@ -938,13 +907,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		cout << "move command: " << move << endl;
 	}
 	
-	// TODO: Analyze data from white noise
-	// Divide every band using this?
-	// https://www.engineeringtoolbox.com/octave-bands-frequency-limits-d_1602.html
-	// i.e FFT and look at these frequency ranges
-	
 	// Reset mics & set best EQ
-	//setBestEQ(speaker_ips, mic_ips);
 	resetEverything(mic_ips);
 	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	enableAudioSystem(all_ips);
