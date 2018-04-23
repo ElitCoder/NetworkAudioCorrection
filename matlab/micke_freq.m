@@ -1,4 +1,4 @@
-clear all
+clearvars
 
 [x, fsx] = audioread('before.wav');
 [y, fsy] = audioread('after.wav');
@@ -13,15 +13,15 @@ y = y(fsy * 2 : fsy * 3.5);
 powPx = pow2db(Px);
 powPy = pow2db(Py);
 
-xLin = 1:0.01:4.5;
-for i = 1:length(xLin)
-    xLog(i) = round(10^xLin(i));
-end
-
-fx = fx(xLog);
-powPx = powPx(xLog);
-fy = fy(xLog);
-powPy = powPy(xLog);
+% xLin = 1:0.1:4.5;
+% for i = 1:length(xLin)
+%     xLog(i) = round(10^xLin(i));
+% end
+% 
+% fx = fx(xLog);
+% powPx = powPx(xLog);
+% fy = fy(xLog);
+% powPy = powPy(xLog);
 
 min_total = min([min(powPx), min(powPy)]);
 max_total = max([max(powPx), max(powPy)]);
