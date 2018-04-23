@@ -20,6 +20,19 @@ static const vector<int> band_limits = {	44,		88,
 											5680,	11360,
 											11360,	22720	};
 
+// Not used right now
+#if 0								
+static const vector<double> eq_limits = {	38.936,		101.936,
+											77.254,		202.254,
+											154.508,	404.508,
+											309.017,	809.017,
+											618.034,	1618.034,
+											1236.068,	3236.068,
+											2472.136,	6472.136,
+											4944.272,	12944.272,
+											9888.544,	25888.544	};										
+#endif
+
 template<class T>
 static T mean(const vector<T>& container) {
 	double sum = 0;

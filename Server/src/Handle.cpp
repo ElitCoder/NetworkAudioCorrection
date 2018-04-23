@@ -783,7 +783,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		cout << "move command: " << move << endl;
 	}
 	
-	#if 0
 	// Get sound level from white noise
 	auto flat_level_db = getSoundLevel(mic_ips);
 	
@@ -865,13 +864,15 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		// Say that this EQ is epic
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
 	}
-	#endif
 	
+	// Used for white noise DSP correction
+	#if 0
 	// Add new EQ
 	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(boosts.front(), 0);
 	
 	// Say that this EQ is epic
 	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
+	#endif
 	
 	// Set test white noise settings
 	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
