@@ -14,7 +14,8 @@ enum {
 	PACKET_CHECK_SOUND_IMAGE,
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
-	PACKET_RESET_EVERYTHING
+	PACKET_RESET_EVERYTHING,
+	PACKET_SET_SOUND_EFFECTS
 };
 
 static NetworkCommunication* g_network;
@@ -227,6 +228,26 @@ void setEQStatus(bool status) {
 	cout << "done\n\n";
 }
 
+Packet createSetSoundEffects(const vector<string>& ips, bool status) {
+	Packet packet;
+	packet.addHeader(PACKET_SET_SOUND_EFFECTS);
+	packet.addBool(status);
+	packet.addInt(ips.size());
+	
+	for (auto& ip : ips)
+		packet.addString(ip);
+		
+	packet.finalize();
+	return packet;
+}
+
+void setSoundEffects(bool status) {
+	cout << (status ? "Enabling" : "Disabling") << " Axis sound effects... \t" << flush;
+	g_network->pushOutgoingPacket(createSetSoundEffects(g_ips, status));
+	g_network->waitForIncomingPacket();
+	cout << "done\n\n";
+}
+
 void run(const string& host, unsigned short port) {
 	cout << "Connecting to server.. ";
 	NetworkCommunication network(host, port);
@@ -245,8 +266,10 @@ void run(const string& host, unsigned short port) {
 		cout << "7. Set best EQ\n\n";
 		
 		cout << "8. Enable EQ in all speakers\n";
-		cout << "9. Disable EQ in all speakers\n\n";
-		cout << "10. Set to speaker defaults (all IPs)\n";
+		cout << "9. Disable EQ in all speakers\n";
+		cout << "10. Enable Axis sound effects\n";
+		cout << "11. Disable Axis sound effects\n\n";
+		cout << "12. Set to speaker defaults (all IPs)\n";
 		cout << "\n: ";
 		
 		int input;
@@ -282,7 +305,13 @@ void run(const string& host, unsigned short port) {
 			case 9: setEQStatus(false);
 				break;
 				
-			case 10: resetEverything();
+			case 10: setSoundEffects(true);
+				break;
+				
+			case 11: setSoundEffects(false);
+				break;
+				
+			case 12: resetEverything();
 				break;
 				
 			default: cout << "Wrong input format!\n";

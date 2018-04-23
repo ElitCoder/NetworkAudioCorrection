@@ -19,7 +19,8 @@ enum {
 	PACKET_CHECK_SOUND_IMAGE,
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
-	PACKET_RESET_EVERYTHING
+	PACKET_RESET_EVERYTHING,
+	PACKET_SET_SOUND_EFFECTS
 };
 
 extern Connection* g_current_connection;
@@ -151,6 +152,19 @@ static void handle(Connection& connection, Packet& input_packet) {
 			Handle::setEQStatus(speakers, status);
 			
 			break;	
+		}
+		
+		case PACKET_SET_SOUND_EFFECTS: {
+			bool status = input_packet.getBool();
+			int num = input_packet.getInt();
+			vector<string> speakers;
+			
+			for (int i = 0; i < num; i++)
+				speakers.push_back(input_packet.getString());
+				
+			Handle::setSoundEffects(speakers, status);
+			
+			break;
 		}
 		
 		default:	cout << "Debug: got some random packet, answering with empty packet\n";

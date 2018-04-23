@@ -911,3 +911,13 @@ void Handle::setBestEQ(const vector<string>& speakers, const vector<string>& mic
 void Handle::setEQStatus(const vector<string>& ips, bool status) {
 	Base::system().runScript(ips, vector<string>(ips.size(), "dspd -s -" + string((status ? "u" : "b")) + " preset; wait\n"));
 }
+
+void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
+	string enable = "dspd -s -u compressor; wait; dspd -s -u loudness; wait; dspd -s -u hpf; wait\n";
+	string disable = "dspd -s -b compressor; wait; dspd -s -b loudness; wait; dspd -s -b hpf; wait\n";
+	
+	if (status)
+		Base::system().runScript(ips, vector<string>(ips.size(), enable));
+	else
+		Base::system().runScript(ips, vector<string>(ips.size(), disable));
+}

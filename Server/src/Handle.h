@@ -18,6 +18,7 @@ public:
 	static void checkSoundImage(const std::vector<std::string>& speakers, const std::vector<std::string>& mics, bool factor_calibration);
 	static void setBestEQ(const std::vector<std::string>& speakers, const std::vector<std::string>& mics);
 	static void setEQStatus(const std::vector<std::string>& ips, bool status);
+	static void setSoundEffects(const std::vector<std::string>& ips, bool status);
 	static void resetIPs(const std::vector<std::string>& ips);
 };
 
