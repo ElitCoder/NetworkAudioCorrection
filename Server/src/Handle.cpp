@@ -50,11 +50,11 @@ static vector<string> g_frequencies = {	"63",
 // Flat EQ
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 // Axis own music EQ with adjustments
-//static vector<double> g_normalization_profile = { 4, 2.5, 1, -1, -1.5, 0, 0, 0, 1 };
+//static vector<double> g_normalization_profile = { 6, 3, 1, -1, -1.5, 0, 0, 0, 3 };
 
 static double g_target_mean = -45;
-vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
-//vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
+//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
+vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -756,6 +756,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	// See calibration score before calibrating
 	auto boosts = getCalibrationScore(mic_ips);
+	
+	for (int i = 0; i < DSP_MAX_BANDS; i++)
+		boosts.front().at(i) += g_normalization_profile.at(i);
 	
 	auto timestamp = getTimestamp();
 	// Remove whitespace
