@@ -53,8 +53,8 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 //static vector<double> g_normalization_profile = { 6, 3, 1, -1, -1.5, 0, 0, 0, 3 };
 
 static double g_target_mean = -45;
-//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
-vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
+vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
+//vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -678,7 +678,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static vector<vector<double>> getCalibrationScore(const vector<string>& mic_ips) {
+static vector<vector<double>> getCalibrationScore(const vector<string>& mic_ips, bool use_old_mean) {
 	vector<vector<double>> boosts;
 	
 	for (auto& mic_ip : mic_ips) {
@@ -698,7 +698,7 @@ static vector<vector<double>> getCalibrationScore(const vector<string>& mic_ips)
 		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 		
 		auto fft_output = nac::fft(sound);
-		auto band_dbs = nac::calculate(fft_output);
+		auto band_dbs = nac::calculate(fft_output, use_old_mean);
 		
 		boosts.push_back(band_dbs.second);
 	}
@@ -755,7 +755,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	auto boosts = getCalibrationScore(mic_ips);
+	auto boosts = getCalibrationScore(mic_ips, false);
 	
 	for (int i = 0; i < DSP_MAX_BANDS; i++)
 		boosts.front().at(i) += g_normalization_profile.at(i);
@@ -783,6 +783,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		cout << "move command: " << move << endl;
 	}
 	
+	#if 0
 	// Get sound level from white noise
 	auto flat_level_db = getSoundLevel(mic_ips);
 	
@@ -864,15 +865,14 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		// Say that this EQ is epic
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
 	}
+	#endif
 	
 	// Used for white noise DSP correction
-	#if 0
 	// Add new EQ
 	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(boosts.front(), 0);
 	
 	// Say that this EQ is epic
 	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
-	#endif
 	
 	// Set test white noise settings
 	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
@@ -882,7 +882,23 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	getCalibrationScore(mic_ips);
+	auto done_boosts = getCalibrationScore(mic_ips, true);
+	
+	#if 0
+	for (size_t i = 0; i < done_boosts.size(); i++) {
+		auto& old = boosts.at(i);
+		auto& current = done_boosts.at(i);
+		
+		for (size_t j = 0; j < current.size(); j++) {
+			auto& old_value = old.at(j);
+			auto& current_value = current.at(j);
+			
+			cout << abs(current_value - old_value) / old_value << " ";
+		}
+		
+		cout << endl;
+	}
+	#endif
 	
 	// Move these white noise recordings to save folder (after)
 	if (!system(NULL)) {
