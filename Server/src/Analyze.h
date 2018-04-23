@@ -10,7 +10,7 @@ using BandOutput = std::pair<std::vector<double>, std::vector<double>>;
 // NetworkAudioCorrection
 namespace nac {
 	FFTOutput fft(const std::vector<short>& samples);
-	BandOutput calculate(const FFTOutput& input, bool use_old_mean);
+	BandOutput calculate(const FFTOutput& input);
 }
 
 #endif

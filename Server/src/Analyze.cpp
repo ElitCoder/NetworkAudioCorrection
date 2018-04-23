@@ -33,9 +33,6 @@ static const vector<double> eq_limits = {	38.936,		101.936,
 											9888.544,	25888.544	};										
 #endif
 
-static bool g_mean_set = false;
-static double g_old_mean;
-
 template<class T>
 static T mean(const vector<T>& container) {
 	double sum = 0;
@@ -116,7 +113,7 @@ namespace nac {
 		return { frequencies, magnitudes };
 	}
 	
-	BandOutput calculate(const FFTOutput& input, bool use_old_mean) {
+	BandOutput calculate(const FFTOutput& input) {
 		auto& frequencies = input.first;
 		auto& magnitudes = input.second;
 		
@@ -143,15 +140,6 @@ namespace nac {
 		
 		auto std_dev = calculateSD(band_energy);
 		auto band_mean = mean(band_energy);
-		
-		if (!g_mean_set) {
-			g_mean_set = true;
-			g_old_mean = mean(band_energy);
-		} else {
-			if (use_old_mean)
-				band_mean = g_old_mean;
-		}
-		
 		vector<double> boost;
 	
 		for (auto& energy : band_energy) {
