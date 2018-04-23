@@ -5,7 +5,7 @@
 #include <vector>
 
 using FFTOutput = std::pair<std::vector<double>, std::vector<double>>;
-using BandOutput = std::vector<double>;
+using BandOutput = std::pair<std::vector<double>, std::vector<double>>;
 
 // NetworkAudioCorrection
 namespace nac {

@@ -53,8 +53,8 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 //static vector<double> g_normalization_profile = { 4, 2.5, 1, -1, -1.5, 0, 0, 0, 1 };
 
 static double g_target_mean = -45;
-//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
-vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
+vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, 1.01998 }; // Which factor the EQ's should be multiplied with to get the right result
+//vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -678,7 +678,9 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static void getCalibrationScore(const vector<string>& mic_ips) {
+static vector<vector<double>> getCalibrationScore(const vector<string>& mic_ips) {
+	vector<vector<double>> boosts;
+	
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -697,7 +699,11 @@ static void getCalibrationScore(const vector<string>& mic_ips) {
 		
 		auto fft_output = nac::fft(sound);
 		auto band_dbs = nac::calculate(fft_output);
+		
+		boosts.push_back(band_dbs.second);
 	}
+	
+	return boosts;
 }
 
 // From NetworkCommunication.cpp
@@ -749,7 +755,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	getCalibrationScore(mic_ips);
+	auto boosts = getCalibrationScore(mic_ips);
 	
 	auto timestamp = getTimestamp();
 	// Remove whitespace
@@ -774,6 +780,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		cout << "move command: " << move << endl;
 	}
 	
+	#if 0
 	// Get sound level from white noise
 	auto flat_level_db = getSoundLevel(mic_ips);
 	
@@ -855,7 +862,14 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		// Say that this EQ is epic
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
 	}
-		
+	#endif
+	
+	// Add new EQ
+	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(boosts.front(), 0);
+	
+	// Say that this EQ is epic
+	Base::system().getSpeaker(speaker_ips.front()).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
+	
 	// Set test white noise settings
 	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	

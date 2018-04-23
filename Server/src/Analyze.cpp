@@ -118,9 +118,18 @@ namespace nac {
 		}
 		
 		auto std_dev = calculateSD(band_energy);
+		auto band_mean = mean(band_energy);
+		vector<double> boost;
+	
+		for (auto& energy : band_energy) {
+			double gain = 20 * log10(energy / band_mean);
+			
+			cout << "Gain: " << gain << endl;
+			boost.push_back(gain * (-1));
+		}
 		
 		cout << "Standard deviation: " << std_dev << endl;
 		
-		return band_energy;
+		return { band_energy, boost };
 	}
 }
