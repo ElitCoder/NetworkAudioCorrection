@@ -1,7 +1,7 @@
 #ifndef NETWORK_COMMUNICATION_H
 #define NETWORK_COMMUNICATION_H
 
-#include "Packet.h"
+#include "PartialPacket.h"
 
 #include <thread>
 #include <mutex>
@@ -11,6 +11,8 @@
 enum NetworkCommunicationConstants {
     BUFFER_SIZE = 4096
 };
+
+class Packet;
 
 class NetworkCommunication {
 public:

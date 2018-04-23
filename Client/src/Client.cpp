@@ -1,8 +1,10 @@
 #include "NetworkCommunication.h"
+#include "Packet.h"
 
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 

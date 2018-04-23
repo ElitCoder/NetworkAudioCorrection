@@ -1,5 +1,7 @@
 #include "Threading.h"
 #include "Packet.h"
+#include "PartialPacket.h"
+#include "NetworkCommunication.h"
 
 #include <iostream>
 #include <netinet/in.h>

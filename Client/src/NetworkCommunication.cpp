@@ -1,5 +1,7 @@
 #include "NetworkCommunication.h"
 #include "Threading.h"
+#include "PartialPacket.h"
+#include "Packet.h"
 
 #include <iostream>
 

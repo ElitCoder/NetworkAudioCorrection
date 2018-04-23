@@ -1,7 +1,10 @@
 #ifndef THREADING_H
 #define THREADING_H
 
-#include "NetworkCommunication.h"
+#include <string>
+
+class PartialPacket;
+class NetworkCommunication;
 
 namespace Threading {
     namespace Public {
