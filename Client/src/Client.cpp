@@ -12,10 +12,16 @@ enum {
 	PACKET_START_LOCALIZATION = 1,
 	PACKET_CHECK_SPEAKERS_ONLINE,
 	PACKET_CHECK_SOUND_IMAGE,
+	PACKET_CHECK_SOUND_IMAGE_WHITE,
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
 	PACKET_RESET_EVERYTHING,
 	PACKET_SET_SOUND_EFFECTS
+};
+
+enum {
+	WHITE_NOISE,
+	NINE_FREQ
 };
 
 static NetworkCommunication* g_network;
@@ -157,10 +163,11 @@ void speakersOnline() {
 	cout << endl;
 }
 
-Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, bool factor_calibration) {
+Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, bool factor_calibration, int type) {
 	Packet packet;
 	packet.addHeader(PACKET_CHECK_SOUND_IMAGE);
 	packet.addBool(factor_calibration);
+	packet.addInt(type);
 	packet.addInt(speakers.size());
 	packet.addInt(mics.size());
 	
@@ -174,13 +181,21 @@ Packet createSoundImage(const vector<string>& speakers, const vector<string>& mi
 	return packet;
 }
 
-void soundImage() {
+void soundImage(int type) {
 	char answer;
 	cout << "Should factor calibration run? (Y/N): ";
 	cin >> answer;
 	
+	switch (type) {
+		case WHITE_NOISE: cout << "\n(White noise)";
+			break;
+			
+		case NINE_FREQ: cout << "\n(9-freq)";
+			break;
+	}
+	
 	cout << "\nRunning sound image correction...\t" << flush;
-	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, answer == 'Y'));
+	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, answer == 'Y', type));
 	g_network->waitForIncomingPacket();
 	cout << "done\n\n";
 }
@@ -263,14 +278,15 @@ void run(const string& host, unsigned short port) {
 		cout << "4. Start speaker localization script (all IPs)\n";
 		cout << "5. Start speaker localization script (all IPs, force update)\n\n";
 		
-		cout << "6. Calibrate sound image & run correction tests\n";
-		cout << "7. Set best EQ\n\n";
+		cout << "6. Calibrate sound image (9-freq)\n";
+		cout << "7. Calibrate sound image (white noise)\n";
+		cout << "8. Set best EQ\n\n";
 		
-		cout << "8. Enable EQ in all speakers\n";
-		cout << "9. Disable EQ in all speakers\n";
-		cout << "10. Enable Axis sound effects\n";
-		cout << "11. Disable Axis sound effects\n\n";
-		cout << "12. Set to speaker defaults (all IPs)\n";
+		cout << "9. Enable EQ in all speakers\n";
+		cout << "10. Disable EQ in all speakers\n";
+		cout << "11. Enable Axis sound effects\n";
+		cout << "12. Disable Axis sound effects\n\n";
+		cout << "13. Set to speaker defaults (all IPs)\n";
 		cout << "\n: ";
 		
 		int input;
@@ -294,25 +310,28 @@ void run(const string& host, unsigned short port) {
 			case 5: startSpeakerLocalizationAll(true);
 				break;	
 				
-			case 6: soundImage();
+			case 6: soundImage(NINE_FREQ);
 				break;
 				
-			case 7: bestEQ();
+			case 7: soundImage(WHITE_NOISE);
 				break;
 				
-			case 8: setEQStatus(true);
+			case 8: bestEQ();
 				break;
 				
-			case 9: setEQStatus(false);
+			case 9: setEQStatus(true);
 				break;
 				
-			case 10: setSoundEffects(true);
+			case 10: setEQStatus(false);
 				break;
 				
-			case 11: setSoundEffects(false);
+			case 11: setSoundEffects(true);
 				break;
 				
-			case 12: resetEverything();
+			case 12: setSoundEffects(false);
+				break;
+				
+			case 13: resetEverything();
 				break;
 				
 			default: cout << "Wrong input format!\n";

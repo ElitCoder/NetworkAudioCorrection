@@ -17,6 +17,7 @@ enum {
 	PACKET_START_LOCALIZATION = 1,
 	PACKET_CHECK_SPEAKERS_ONLINE,
 	PACKET_CHECK_SOUND_IMAGE,
+	PACKET_CHECK_SOUND_IMAGE_WHITE,
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
 	PACKET_RESET_EVERYTHING,
@@ -110,6 +111,7 @@ static void handle(Connection& connection, Packet& input_packet) {
 			vector<string> mics;
 			
 			bool factor_calibration = input_packet.getBool();
+			int type = input_packet.getInt();
 			int num_speakers = input_packet.getInt();
 			int num_mics = input_packet.getInt();
 			
@@ -119,7 +121,7 @@ static void handle(Connection& connection, Packet& input_packet) {
 			for (int i = 0; i < num_mics; i++)
 				mics.push_back(input_packet.getString());
 
-			Handle::checkSoundImage(speakers, mics, factor_calibration);
+			Handle::checkSoundImage(speakers, mics, factor_calibration, type);
 			
 			break;
 		}

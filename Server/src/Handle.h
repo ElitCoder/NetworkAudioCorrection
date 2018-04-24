@@ -15,7 +15,7 @@ class Handle {
 public:
 	static PlacementOutput runLocalization(const std::vector<std::string>& ips, bool force_update);
 	static std::vector<bool> checkSpeakersOnline(const std::vector<std::string>& ips);
-	static void checkSoundImage(const std::vector<std::string>& speakers, const std::vector<std::string>& mics, bool factor_calibration);
+	static void checkSoundImage(const std::vector<std::string>& speakers, const std::vector<std::string>& mics, bool factor_calibration, int type);
 	static void setBestEQ(const std::vector<std::string>& speakers, const std::vector<std::string>& mics);
 	static void setEQStatus(const std::vector<std::string>& ips, bool status);
 	static void setSoundEffects(const std::vector<std::string>& ips, bool status);

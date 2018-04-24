@@ -34,6 +34,11 @@ enum {
 	TYPE_WHITE_EQ
 };
 
+enum {
+	WHITE_NOISE,
+	NINE_FREQ
+};
+
 // We're not multithreading anyway
 Connection* g_current_connection = nullptr;
 
@@ -732,9 +737,16 @@ static BandOutput getPinkResponse(const vector<short>& data, size_t sound_start,
 // From NetworkCommunication.cpp
 extern string getTimestamp();
 
-void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration) {
-	// TODO: Change this
-	bool run_white_noise = true;
+void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
+	bool run_white_noise = false;
+	
+	if (type == WHITE_NOISE)
+		run_white_noise = true;
+		
+	if (run_white_noise)
+		cout << "Running white noise sound image\n";
+	else
+		cout << "Running 9-freq tone sound image\n";
 	
 	vector<string> all_ips(speaker_ips);
 	all_ips.insert(all_ips.end(), mic_ips.begin(), mic_ips.end());
