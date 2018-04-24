@@ -376,7 +376,8 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_FLAT_EQ: dsp_gain = -12;
+			// Max speaker when testing pink noise
+			case TYPE_FLAT_EQ: dsp_gain = 0;
 				break;
 				
 			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
@@ -430,6 +431,8 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 				
 				// Get EQ at frequency j
 				double wanted_eq = eqs.at(j).at(k).at(i);
+				
+				cout << "Speaker " << speaker_ips.at(k) << " has weight " << weight << " and adding EQ " << weight * wanted_eq << " to band " << i << endl;
 				
 				// Sk[i] += weight * Mj[i]
 				final_eqs.at(k).at(i) += weight * wanted_eq;
@@ -730,7 +733,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", false);
 	
 	// Find correction factor
-	if (factor_calibration /* Use some switch later on, let's calibrate every time for now */) {
+	if (factor_calibration) {
 		vector<FactorData> factor_data;
 		
 		for (int i = 0; i < 25; i++) {
