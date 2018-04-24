@@ -32,8 +32,8 @@ end
 fy = fy(xLog(2:length(xLog)));
 powPy = newPowPy;
 
-min_total = min([min(powPx), min(powPy)]) - 20;
-max_total = max([max(powPx(2:length(powPx))), max(powPy(2:length(powPx)))]) + 20;
+min_total = min([min(powPx), min(powPy)]) - 3;
+max_total = max([max(powPx(2:length(powPx))), max(powPy(2:length(powPx)))]) + 3;
 
 x_mean = mean(powPx);
 y_mean = mean(powPy);
