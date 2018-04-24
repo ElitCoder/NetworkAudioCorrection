@@ -38,20 +38,33 @@ max_total = max([max(powPx(2:length(powPx))), max(powPy(2:length(powPx)))]) + 20
 x_mean = mean(powPx);
 y_mean = mean(powPy);
 
-ax = subplot(2, 1, 1);
-plot(ax, fx, powPx);
-axis(ax, [44, 22720, min_total, max_total]);
+
+ax = subplot(3, 1, 1);
+plot(ax,fx, powPx);
+axis(ax,[44, 22720, min_total, max_total]);
 set(ax, 'XScale', 'log')
 title(ax, 'Before');
 ylabel(ax, 'Magnitude (dB)');
 xlabel(ax, 'Frequency (Hz)');
 grid on
 
-ay = subplot(2, 1, 2);
+ay = subplot(3, 1, 2);
 plot(ay, fy, powPy);
 axis(ay, [44, 22720, min_total, max_total]);
 set(ay, 'XScale', 'log')
 title(ay, 'After');
 ylabel(ay, 'Magnitude (dB)');
 xlabel(ay, 'Frequency (Hz)');
+grid on
+
+%Adds a combined plot of both curves for comparing
+both = subplot(3, 1, 3);
+plot(both, fx, powPx, 'r');
+hold on
+plot(both, fy, powPy, 'g');
+axis(both, [44, 22720, min_total, max_total]);
+set(both, 'XScale', 'log');
+title(both, 'Combined');
+ylabel(both, 'Magnitude (dB)');
+xlabel(both, 'Frequency (Hz)');
 grid on
