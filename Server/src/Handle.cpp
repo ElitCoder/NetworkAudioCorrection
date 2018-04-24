@@ -268,7 +268,7 @@ static vector<double> getFFT9(const vector<short>& data, size_t start, size_t en
 	return dbs;
 }
 
-static vector<double> getSoundImageCorrection(vector<double> dbs) {
+static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noise) {
 	vector<double> eq;
 	
 	for (size_t i = 0; i < dbs.size(); i++) {
@@ -278,6 +278,17 @@ static vector<double> getSoundImageCorrection(vector<double> dbs) {
 		double difference = profile_db - db;
 
 		eq.push_back(difference);
+	}
+	
+	if (white_noise) {
+		// Close bands affect eachother when EQ:ing
+		vector<double> final_eq(eq);
+		
+		for (size_t i = 0; i < eq.size() - 1; i++) {
+			final_eq.at(i) -= (eq.at(i + 1) / 6);
+		}
+		
+		eq = final_eq;
 	}
 	
 	return eq;
@@ -856,7 +867,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
 			
 			// Calculate correction EQ
-			auto eq = getSoundImageCorrection(dbs);
+			auto eq = getSoundImageCorrection(dbs, run_white_noise);
 			
 			cout << "Which gives the correction EQ of:\n";
 			for (size_t j = 0; j < eq.size(); j++)
