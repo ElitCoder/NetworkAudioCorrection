@@ -2,8 +2,8 @@ clearvars
 clear all
 close all
 
-[x, fsx] = audioread('before.wav');
-[y, fsy] = audioread('after.wav');
+[x, fsx] = audioread('before2.wav');
+[y, fsy] = audioread('after2.wav');
 
 % cut silence
 x = x(fsx * 2 : fsx * 3.5);
