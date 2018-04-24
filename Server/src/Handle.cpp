@@ -280,6 +280,9 @@ static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noi
 		eq.push_back(difference);
 	}
 	
+	if (white_noise) {}
+	
+	#if 0
 	if (white_noise) {
 		// Close bands affect eachother when EQ:ing
 		vector<double> final_eq(eq);
@@ -290,6 +293,7 @@ static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noi
 		
 		eq = final_eq;
 	}
+	#endif
 	
 	return eq;
 }
