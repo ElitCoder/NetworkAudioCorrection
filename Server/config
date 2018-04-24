@@ -4,7 +4,7 @@ port: 10200
 # Files
 goertzel: testTone.wav
 sound_image_file_short: 9_freq_3s.wav
-white_noise: pink_noise_3s.wav
+white_noise: white_noise_3s.wav
 
 # Testing
 no_scripts: 0

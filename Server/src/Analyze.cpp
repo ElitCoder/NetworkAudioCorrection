@@ -129,6 +129,7 @@ namespace nac {
 		auto& magnitudes = input.second;
 		
 		vector<double> band_energy(band_limits.size() / 2, 0);
+		vector<double> band_nums(band_limits.size() / 2, 0);
 		
 		// Analyze bands
 		for (size_t i = 0; i < frequencies.size(); i++) {
@@ -139,9 +140,13 @@ namespace nac {
 				continue;
 			
 			band_energy.at(index) += magnitudes.at(i);
+			band_nums.at(index)++;
 		}
 		
-		auto std_dev = calculateSD(band_energy);
+		// Calculate mean band energy
+		for (size_t i = 0; i < band_energy.size(); i++)
+			band_energy.at(i) /= band_nums.at(i);
+		
 		vector<double> gains;
 	
 		for (size_t i = 0; i < band_energy.size(); i++) {
@@ -152,6 +157,7 @@ namespace nac {
 			gains.push_back(gain);
 		}
 		
+		auto std_dev = calculateSD(band_energy);
 		auto std_dev_db = calculateSD(gains);
 		
 		cout << "Standard deviation: " << std_dev << endl;
