@@ -285,10 +285,7 @@ static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noi
 		vector<double> final_eq(eq);
 		
 		for (size_t i = 0; i < eq.size() - 1; i++) {
-			if (abs(eq.at(i + 1)) < 3)
-				continue;
-
-			final_eq.at(i) -= (eq.at(i + 1) / 3);
+			final_eq.at(i) -= (eq.at(i + 1) / 6);
 		}
 		
 		eq = final_eq;
