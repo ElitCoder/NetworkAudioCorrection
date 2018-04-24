@@ -1,4 +1,6 @@
 clearvars
+clear all
+close all
 
 [x, fsx] = audioread('before.wav');
 [y, fsy] = audioread('after.wav');
