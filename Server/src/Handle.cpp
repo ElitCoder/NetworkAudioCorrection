@@ -406,7 +406,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_volume);
 				break;
 				
-			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
+			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_volume;
 				break;
 		}
 		
