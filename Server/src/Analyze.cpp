@@ -72,12 +72,12 @@ static double calculateSD(const vector<double>& data) {
 static int getBandIndex(double frequency) {
 	// TODO: Microphone/speaker should be profile inputs to the program
 	// Mic can't pick up this anyway
-	//if (frequency < 20 || frequency > 20000)
-	//	return -1;
+	if (frequency < 20 || frequency > 20000)
+		return -1;
 		
 	// Speaker can't play this anyway
-	//if (frequency < 60)
-	//	return -1;
+	if (frequency < 60)
+		return -1;
 		
 	for (size_t i = 0; i < band_limits.size(); i += 2) {
 		auto& lower = band_limits.at(i);

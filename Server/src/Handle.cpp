@@ -799,6 +799,35 @@ static void writeEQSettings(const string& where, const string& timestamp, const 
 	eqs.close();
 }
 
+static string moveFileMATLAB(const string& where, const string& timestamp, const vector<string>& mic_ips) {
+	string folder = "../save/white_noises/" + where + "/" + timestamp + "/";
+	
+	vector<string> copy_after;
+	
+	if (mic_ips.size() > 1) {
+		for (auto& mic_ip : mic_ips)
+			copy_after.push_back("cp " + folder + "cap" + mic_ip + ".wav ../matlab/");
+	} else {
+		copy_after.push_back("cp " + folder + "*.wav ../matlab/" + where + ".wav");
+	}
+	
+	for (auto& command : copy_after)
+		system(command.c_str());
+		
+	return folder;
+}
+
+static void moveToMATLAB(const string& timestamp, const vector<string>& mic_ips) {
+	if (!system(NULL))
+		return;
+
+	moveFileMATLAB("before", timestamp, mic_ips);
+	string folder_after = moveFileMATLAB("after", timestamp, mic_ips);
+	string copy_eqs = "cp " + folder_after + "eqs ../matlab/";
+	
+	system(copy_eqs.c_str());
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
 	bool run_white_noise = false;
 	
@@ -964,6 +993,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	writeWhiteNoiseFiles("after", timestamp);
 	writeEQSettings("after", timestamp, speaker_ips);
+	moveToMATLAB(timestamp, mic_ips);
 	
 	// Reset mics & set best EQ
 	resetEverything(mic_ips);
