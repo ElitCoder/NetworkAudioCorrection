@@ -77,6 +77,14 @@ end
 eqs = subplot(2, 1, 2);
 hold on
 for i = 1:num
+    if num > 2
+        continue;
+    end
+    
+    a = eq_matrix(i,:)'; b = num2str(a); c = cellstr(b);
+    dx = 0.2; dy = 0.2;
+    text(fx(index_vector) + dx, eq_matrix(i,:) + dy, c);
+    
     plot(eqs, fx(index_vector), eq_matrix(i,:), '-o');
 end
 
