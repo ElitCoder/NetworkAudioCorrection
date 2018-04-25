@@ -829,6 +829,9 @@ static void moveToMATLAB(const string& timestamp, const vector<string>& mic_ips)
 }
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
+	// Set g_dsp_factor
+	g_speaker_dsp_factor = nac::availability();
+	
 	bool run_white_noise = false;
 	
 	if (type == WHITE_NOISE)

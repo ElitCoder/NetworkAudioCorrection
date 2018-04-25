@@ -81,6 +81,11 @@ static double correctMaxEQ(vector<double>& eq) {
 	double total_mean_change = 0;
 	
 	for (int i = 0; i < 1000; i++) {
+		if (i == 1) {
+			for (size_t j = 0; j < eq.size(); j++)
+				eq.at(j) /= g_speaker_dsp_factor.at(j);
+		}
+		
 		double mean_db = getMean(eq);
 		
 		for (auto& setting : eq)
@@ -182,7 +187,7 @@ void Speaker::setNextEQ(const vector<double>& eq, double score) {
 		correction_eq_ = vector<double>(DSP_MAX_BANDS, 0);
 		
 	for (size_t i = 0; i < eq.size(); i++)
-		correction_eq_.at(i) += eq.at(i) / g_speaker_dsp_factor.at(i);
+		correction_eq_.at(i) += eq.at(i);
 	
 	correction_volume_ = volume_ + correctMaxEQ(correction_eq_);
 	

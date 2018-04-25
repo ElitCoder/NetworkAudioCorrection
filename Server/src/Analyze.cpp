@@ -91,6 +91,24 @@ static int getBandIndex(double frequency) {
 }
 
 namespace nac {
+	vector<double> availability() {
+		double first = band_limits.at(1) - band_limits.front();
+		double last = band_limits.back() - band_limits.at(band_limits.size() - 2);
+		
+		// How much of the first and last band are affected with changing the DSP since we cut values < 60 & > 20k
+		double first_available = band_limits.at(1) - 60;
+		double last_available = 20000 - band_limits.at(band_limits.size() - 2);
+		
+		vector<double> available_change = { first_available  / first, 1, 1, 1, 1, 1, 1, 1, last_available / last };
+		
+		cout << "Available DSP change: ";
+		for (auto& available : available_change)
+			cout << available << " ";
+		cout << endl;
+		
+		return available_change;
+	}
+	
 	FFTOutput fft(const vector<short>& samples) {
 		vector<double> in;
 		
