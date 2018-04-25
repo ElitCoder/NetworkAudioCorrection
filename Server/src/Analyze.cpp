@@ -1,4 +1,5 @@
 #include "Analyze.h"
+#include "Speaker.h"
 
 // FFTW3
 #include <fftw3.h>
@@ -92,6 +93,7 @@ static int getBandIndex(double frequency) {
 
 namespace nac {
 	vector<double> availability() {
+		// Tests show that this is only valid if we're using 1 speaker, disable it for real testing
 		double first = band_limits.at(1) - band_limits.front();
 		double last = band_limits.back() - band_limits.at(band_limits.size() - 2);
 		
@@ -101,10 +103,7 @@ namespace nac {
 		
 		double first_factor = first_available / first;
 		double last_factor = last_available / last;
-		
-	//	first_factor *= first_factor;
-	
-		
+
 		vector<double> available_change = { first_factor, 1, 1, 1, 1, 1, 1, 1, last_factor };
 		
 		cout << "Available DSP change: ";
@@ -113,7 +112,10 @@ namespace nac {
 		cout << endl;
 		
 		return available_change;
-		//return vector<double>(9, 1);
+		
+		#if 0
+		return vector<double>(DSP_MAX_BANDS, 1);
+		#endif
 	}
 	
 	FFTOutput fft(const vector<short>& samples) {

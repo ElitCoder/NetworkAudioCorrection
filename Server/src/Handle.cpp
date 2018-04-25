@@ -776,7 +776,7 @@ static void writeEQSettings(const string& where, const string& timestamp, const 
 		return;
 		
 	string folder = "../save/white_noises/" + where + "/" + timestamp;
-	string file = folder + "/" + "eqs";
+	string file = folder + "eqs";
 	
 	ofstream eqs(file);
 	
@@ -800,19 +800,21 @@ static void writeEQSettings(const string& where, const string& timestamp, const 
 }
 
 static string moveFileMATLAB(const string& where, const string& timestamp, const vector<string>& mic_ips) {
-	string folder = "../save/white_noises/" + where + "/" + timestamp + "/";
+	string folder = "../save/white_noises/" + where + "/" + timestamp;
 	
 	vector<string> copy_after;
 	
 	if (mic_ips.size() > 1) {
 		for (auto& mic_ip : mic_ips)
-			copy_after.push_back("cp " + folder + "cap" + mic_ip + ".wav ../matlab/");
+			copy_after.push_back("cp " + folder + "cap" + mic_ip + ".wav ../matlab/" + where + mic_ip + ".wav");
 	} else {
 		copy_after.push_back("cp " + folder + "*.wav ../matlab/" + where + ".wav");
 	}
 	
-	for (auto& command : copy_after)
+	for (auto& command : copy_after) {
+		cout << "Copy command: " << command << endl;
 		system(command.c_str());
+	}
 		
 	return folder;
 }
@@ -825,6 +827,7 @@ static void moveToMATLAB(const string& timestamp, const vector<string>& mic_ips)
 	string folder_after = moveFileMATLAB("after", timestamp, mic_ips);
 	string copy_eqs = "cp " + folder_after + "eqs ../matlab/";
 	
+	cout << "Copy EQs: " << copy_eqs << endl;
 	system(copy_eqs.c_str());
 }
 
