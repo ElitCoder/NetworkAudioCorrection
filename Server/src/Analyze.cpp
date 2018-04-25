@@ -99,7 +99,13 @@ namespace nac {
 		double first_available = band_limits.at(1) - 60;
 		double last_available = 20000 - band_limits.at(band_limits.size() - 2);
 		
-		vector<double> available_change = { first_available  / first, 1, 1, 1, 1, 1, 1, 1, last_available / last };
+		double first_factor = first_available / first;
+		double last_factor = last_available / last;
+		
+		first_factor *= first_factor;
+		last_factor *= last_factor;
+		
+		vector<double> available_change = { first_factor, 1, 1, 1, 1, 1, 1, 1, last_factor };
 		
 		cout << "Available DSP change: ";
 		for (auto& available : available_change)
@@ -107,6 +113,7 @@ namespace nac {
 		cout << endl;
 		
 		return available_change;
+		//return vector<double>(9, 1);
 	}
 	
 	FFTOutput fft(const vector<short>& samples) {
