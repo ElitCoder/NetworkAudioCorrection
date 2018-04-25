@@ -8,4 +8,4 @@ cd Server/ && make clean && cd ../
 rm -rf nessh
 
 # clean matlab
-rm -f matlab/*.wav
+rm -f matlab/*.wav matlab/eqs
