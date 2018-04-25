@@ -2,8 +2,8 @@ clearvars
 clear all
 close all
 
-[x, fsx] = audioread('before2.wav');
-[y, fsy] = audioread('after2.wav');
+[x, fsx] = audioread('before.wav');
+[y, fsy] = audioread('after.wav');
 
 % cut silence
 x = x(fsx * 2 : fsx * 3.5);
@@ -42,7 +42,7 @@ y_mean = mean(powPy);
 
 
 ax = subplot(3, 1, 1);
-plot(ax,fx, powPx);
+plot(ax,fx, powPx, 'r');
 axis(ax,[44, 22720, min_total, max_total]);
 set(ax, 'XScale', 'log')
 title(ax, 'Before');
@@ -51,7 +51,7 @@ xlabel(ax, 'Frequency (Hz)');
 grid on
 
 ay = subplot(3, 1, 2);
-plot(ay, fy, powPy);
+plot(ay, fy, powPy, 'g');
 axis(ay, [44, 22720, min_total, max_total]);
 set(ay, 'XScale', 'log')
 title(ay, 'After');
