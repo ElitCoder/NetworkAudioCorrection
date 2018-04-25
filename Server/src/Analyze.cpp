@@ -102,8 +102,8 @@ namespace nac {
 		double first_factor = first_available / first;
 		double last_factor = last_available / last;
 		
-		first_factor *= first_factor;
-		last_factor *= last_factor;
+	//	first_factor *= first_factor;
+	
 		
 		vector<double> available_change = { first_factor, 1, 1, 1, 1, 1, 1, 1, last_factor };
 		
