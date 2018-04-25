@@ -14,6 +14,7 @@
 #include <cmath>
 #include <algorithm>
 #include <climits>
+#include <fstream>
 
 using namespace std;
 
@@ -406,7 +407,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_volume);
 				break;
 				
-			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_volume;
+			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
 				break;
 		}
 		
@@ -737,6 +738,67 @@ static BandOutput getPinkResponse(const vector<short>& data, size_t sound_start,
 // From NetworkCommunication.cpp
 extern string getTimestamp();
 
+static string writeWhiteNoiseFiles(const string& where, string timestamp = "") {
+	if (timestamp.empty()) {
+		timestamp = getTimestamp();
+		// Remove whitespace
+		replace(timestamp.begin(), timestamp.end(), ' ', '_');
+		// Remove ':'
+		replace(timestamp.begin(), timestamp.end(), ':', '_');
+		timestamp.pop_back();
+		timestamp += '/';
+	}
+	
+	if (!system(NULL)) {
+		cout << "WARNING: No shell available\n";
+		
+		return timestamp;
+	}
+	
+	// Create folders for this data
+	string folder =	"../save/white_noises/";
+	folder +=		where + "/" + timestamp;
+	
+	string mkdir = "mkdir " + folder;
+	string move = "cp results/cap* " + folder;
+	
+	system(mkdir.c_str());
+	system(move.c_str());
+	
+	cout << "mkdir command: " << mkdir << endl;
+	cout << "move command: " << move << endl;
+	
+	return timestamp;
+}
+
+static void writeEQSettings(const string& where, const string& timestamp, const vector<string>& speaker_ips) {
+	if (!system(NULL))
+		return;
+		
+	string folder = "../save/white_noises/" + where + "/" + timestamp;
+	string file = folder + "/" + "eqs";
+	
+	ofstream eqs(file);
+	
+	if (!eqs.is_open()) {
+		cout << "Warning: could not open " << file << " for writing\n";
+		
+		return;
+	}
+	
+	auto speakers = Base::system().getSpeakers(speaker_ips);
+	
+	// Write number of speakers
+	eqs << speakers.size() << endl;
+	
+	for (auto* speaker : speakers) {
+		for (auto& setting : speaker->getBestEQ())
+			eqs << setting << endl;
+	}
+	
+	eqs.close();
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
 	bool run_white_noise = false;
 	
@@ -795,28 +857,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// See calibration score before calibrating
 	getCalibrationScore(mic_ips);
 	
-	auto timestamp = getTimestamp();
-	// Remove whitespace
-	replace(timestamp.begin(), timestamp.end(), ' ', '_');
-	// Remove ':'
-	replace(timestamp.begin(), timestamp.end(), ':', '_');
-	timestamp.pop_back();
-	timestamp += '/';
-	
-	// Move these white noise recordings to save folder (before)
-	if (!system(NULL)) {
-		cout << "WARNING: No shell available\n";
-	} else {
-		// Create folders for this data
-		string folder = "../save/white_noises/before/" + timestamp;
-		string mkdir = "mkdir " + folder;
-		string move = "cp results/cap* " + folder;
-		system(mkdir.c_str());
-		system(move.c_str());
-		
-		cout << "mkdir command: " << mkdir << endl;
-		cout << "move command: " << move << endl;
-	}
+	auto timestamp = writeWhiteNoiseFiles("before");
 	
 	// Get sound level from white noise
 	auto flat_level_db = getSoundLevel(mic_ips);
@@ -921,20 +962,8 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// See calibration score before calibrating
 	getCalibrationScore(mic_ips);
 	
-	// Move these white noise recordings to save folder (after)
-	if (!system(NULL)) {
-		cout << "WARNING: No shell available\n";
-	} else {
-		// Create folders for this data
-		string folder = "../save/white_noises/after/" + timestamp;
-		string mkdir = "mkdir " + folder;
-		string move = "cp results/cap* " + folder;
-		system(mkdir.c_str());
-		system(move.c_str());
-		
-		cout << "mkdir command: " << mkdir << endl;
-		cout << "move command: " << move << endl;
-	}
+	writeWhiteNoiseFiles("after", timestamp);
+	writeEQSettings("after", timestamp, speaker_ips);
 	
 	// Reset mics & set best EQ
 	resetEverything(mic_ips);

@@ -60,12 +60,11 @@ double Speaker::getLoudestBestEQ() const {
 	if (current_best_eq_.empty())
 		return 0;
 	
-	// Ignore this for now
 	// Only check up to 1.5 kHz since the compressor/limiter won't bother with attenuating frequencies above that
 	// Index 4 represents 2000 kHz
-	//return *max_element(current_best_eq_.begin(), current_best_eq_.begin() + 4);
+	return *max_element(current_best_eq_.begin(), current_best_eq_.begin() + 4);
 	
-	return *max_element(current_best_eq_.begin(), current_best_eq_.end());
+	//return *max_element(current_best_eq_.begin(), current_best_eq_.end());
 }
 
 template<class T>
