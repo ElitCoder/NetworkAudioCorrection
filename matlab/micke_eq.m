@@ -1,5 +1,4 @@
 clearvars
-clear all
 close all
 
 [x, fsx] = audioread('before.wav');
@@ -42,26 +41,8 @@ y_mean = mean(powPy);
 
 set(0, 'DefaultAxesFontSize', 8);
 
-ax = subplot(4, 1, 1);
-plot(ax,fx, powPx, 'r');
-axis(ax,[44, 22720, min_total, max_total]);
-set(ax, 'XScale', 'log')
-title(ax, 'Before');
-ylabel(ax, 'dB');
-xlabel(ax, 'Hz');
-grid on
-
-ay = subplot(4, 1, 2);
-plot(ay, fy, powPy, 'g');
-axis(ay, [44, 22720, min_total, max_total]);
-set(ay, 'XScale', 'log')
-title(ay, 'After');
-ylabel(ay, 'dB');
-xlabel(ay, 'Hz');
-grid on
-
 %Adds a combined plot of both curves for comparing
-both = subplot(4, 1, 3);
+both = subplot(2, 1, 1);
 plot(both, fx, powPx, 'r');
 hold on
 plot(both, fy, powPy, 'g');
@@ -79,6 +60,7 @@ num = A(1);
 A = A(2 : end);
 
 eq_matrix = zeros(num, 9);
+eq_numbers = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
 for i = 1:num
     for j = 1:9
@@ -86,10 +68,18 @@ for i = 1:num
     end
 end
 
-eqs = subplot(4, 1, 4);
-plot(eqs, fx, powPx, 'r');
+index_vector = zeros(1,9);
+for i = 1:9
+    [~, index] = min(abs(fx-eq_numbers(i)));
+    index_vector(i) = index;
+end
+
+eqs = subplot(2, 1, 2);
 hold on
-plot(eqs, fy, powPy, 'g');
+for i = 1:num
+    plot(eqs, fx(index_vector), eq_matrix(i,:), '-o');
+end
+
 axis(eqs, [44, 22720, -15, 15]);
 set(eqs, 'XScale', 'log');
 title(eqs, 'EQs');
