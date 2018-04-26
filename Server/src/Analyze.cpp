@@ -48,11 +48,12 @@ static vector<string> g_frequencies =	{	"63",
 // If we're recording outside of these ranges, changes won't matter since the microphone doesn't pick it up anyway
 // If we're boosting outside of these ranges, changes won't matter since the speaker won't play these frequencies
 // So, ignore them in the calibration since it won't be effective in real life anyway
-const bool	ENABLE_DEVICE_PROFILES	= true;
-const int	SPEAKER_MIN_HZ			= 60;
-const int	SPEAKER_MAX_HZ			= 20000;
-const int	MIC_MIN_HZ				= 20;
-const int	MIC_MAX_HZ				= 20000;
+const bool	ENABLE_DEVICE_PROFILES_INPUT	= true;
+const bool	ENABLE_DEVICE_PROFILES_OUTPUT	= true;
+const int	SPEAKER_MIN_HZ					= 60;
+const int	SPEAKER_MAX_HZ					= 20000;
+const int	MIC_MIN_HZ						= 20;
+const int	MIC_MAX_HZ						= 20000;
 
 template<class T>
 static T mean(const vector<T>& container) {
@@ -83,13 +84,13 @@ static double calculateSD(const vector<double>& data) {
 static int getBandIndex(double frequency) {
 	// TODO: Microphone/speaker should be profile inputs to the program
 	// Mic can't pick up this anyway
-	if (ENABLE_DEVICE_PROFILES) {
+	if (ENABLE_DEVICE_PROFILES_INPUT) {
 		if (frequency < MIC_MIN_HZ || frequency > MIC_MAX_HZ)
 			return -1;
 			
 		// Speaker can't play this anyway
-		if (frequency < SPEAKER_MIN_HZ || frequency > SPEAKER_MAX_HZ)
-			return -1;
+		//if (frequency < SPEAKER_MIN_HZ || frequency > SPEAKER_MAX_HZ)
+		//	return -1;
 	}
 	
 	for (size_t i = 0; i < band_limits.size(); i += 2) {
@@ -106,7 +107,7 @@ static int getBandIndex(double frequency) {
 namespace nac {
 	vector<double> availability() {
 		// Only use this if we're using device profiles
-		if (!ENABLE_DEVICE_PROFILES) {
+		if (!ENABLE_DEVICE_PROFILES_OUTPUT) {
 			cout << "Warning: calling nac::availability() with device profiles disabled\n";
 			
 			return vector<double>(DSP_MAX_BANDS, 1);
@@ -117,8 +118,8 @@ namespace nac {
 		double last = band_limits.back() - band_limits.at(band_limits.size() - 2);
 		
 		// How much of the first and last band are affected with changing the DSP since we cut values < 60 & > 20k
-		double first_available = band_limits.at(1) - max(SPEAKER_MIN_HZ, MIC_MIN_HZ);
-		double last_available = min(MIC_MAX_HZ, SPEAKER_MAX_HZ) - band_limits.at(band_limits.size() - 2);
+		double first_available = band_limits.at(1) - SPEAKER_MIN_HZ;
+		double last_available = SPEAKER_MAX_HZ - band_limits.at(band_limits.size() - 2);
 		
 		double first_factor = first_available / first;
 		double last_factor = last_available / last;
