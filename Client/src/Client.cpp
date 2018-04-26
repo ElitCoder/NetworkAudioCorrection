@@ -16,7 +16,8 @@ enum {
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
 	PACKET_RESET_EVERYTHING,
-	PACKET_SET_SOUND_EFFECTS
+	PACKET_SET_SOUND_EFFECTS,
+	PACKET_TESTING
 };
 
 enum {
@@ -264,6 +265,20 @@ void setSoundEffects(bool status) {
 	cout << "done\n\n";
 }
 
+Packet createTesting() {
+	Packet packet;
+	packet.addHeader(PACKET_TESTING);
+	packet.finalize();
+	return packet;
+}
+
+void testing() {
+	cout << "Running testing method in server.. \t" << flush;
+	g_network->pushOutgoingPacket(createTesting());
+	g_network->waitForIncomingPacket();
+	cout << "done\n\n";
+}
+
 void run(const string& host, unsigned short port) {
 	cout << "Connecting to server.. ";
 	NetworkCommunication network(host, port);
@@ -332,6 +347,9 @@ void run(const string& host, unsigned short port) {
 				break;
 				
 			case 13: resetEverything();
+				break;
+				
+			case 99: testing();
 				break;
 				
 			default: cout << "Wrong input format!\n";

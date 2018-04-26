@@ -20,6 +20,9 @@ public:
 	static void setEQStatus(const std::vector<std::string>& ips, bool status);
 	static void setSoundEffects(const std::vector<std::string>& ips, bool status);
 	static void resetIPs(const std::vector<std::string>& ips);
+	
+	// For testing methods
+	static void testing();
 };
 
 #endif

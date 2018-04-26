@@ -4,12 +4,12 @@
 
 #include "Handle.h"
 #include "Speaker.h"
+#include "Profile.h"
 
 // libnessh
 #include <libnessh/SSHMaster.h>
 
 #include <vector>
-
 // Contains SSH connections to all speakers and current speaker settings
 class System {
 public:
@@ -23,7 +23,16 @@ public:
 	Speaker& getSpeaker(const std::string& ip);
 	std::vector<Speaker*> getSpeakers(const std::vector<std::string>& ips);
 	
+	void setSpeakerProfile(const Profile& profile);
+	void setMicrophoneProfile(const Profile& profile);
+	
+	const Profile& getSpeakerProfile() const;
+	const Profile& getMicrophoneProfile() const;
+	
 private:
+	Profile speaker_profile_;
+	Profile microphone_profile_;
+	
 	Speaker& addSpeaker(Speaker& speaker);
 	
 	std::vector<Speaker> speakers_;

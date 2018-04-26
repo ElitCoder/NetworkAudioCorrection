@@ -2,8 +2,8 @@ CPP_FILES	:= $(wildcard src/*.cpp)
 OBJ_FILES	:= $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 
 CC_FLAGS	:= -std=c++14 -Wall -Wextra -pedantic-errors
-CC_FLAGS	+= -fopenmp
-LD_LIBS		:= -fopenmp -lfftw3 -lnessh -lcurl -lcurlpp -lpthread
+CC_FLAGS	+= -fopenmp -Dunix
+LD_LIBS		:= -fopenmp -lnessh -lcurl -lcurlpp -lpthread -larmadillo
 
 EXECUTABLE	:= Server
 

@@ -189,3 +189,19 @@ bool System::getRecordings(const vector<string>& ips) {
 	
 	return getFile(ips, from, to);
 }
+
+void System::setSpeakerProfile(const Profile& profile) {
+	speaker_profile_ = profile;
+}
+
+void System::setMicrophoneProfile(const Profile& profile) {
+	microphone_profile_ = profile;
+}
+
+const Profile& System::getSpeakerProfile() const {
+	return speaker_profile_;
+}
+
+const Profile& System::getMicrophoneProfile() const {
+	return microphone_profile_;
+}

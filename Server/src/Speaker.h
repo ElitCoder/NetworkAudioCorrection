@@ -8,12 +8,6 @@
 
 using MicFrequencyResponse = std::vector<std::pair<std::string, std::vector<double>>>;
 
-enum {
-	DSP_MAX_EQ = 12,
-	DSP_MIN_EQ = -12,
-	DSP_MAX_BANDS = 9
-};
-
 class Speaker {
 public:
 	// For placing speakers
@@ -43,7 +37,7 @@ public:
 	
 	// EQ setters
 	void clearAllEQs();
-	void setNextEQ(const std::vector<double>& eq, double score, bool add_factor);
+	void setNextEQ(const std::vector<double>& eq, double score);
 	void setNextVolume();
 	void setBestVolume();
 	

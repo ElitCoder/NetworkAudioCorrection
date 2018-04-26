@@ -53,6 +53,7 @@ static vector<string> g_frequencies =	{	"63",
 											"8000",
 											"16000"	};
 
+// Customer's profile, just keep it flat for now
 // Flat EQ
 static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 // Axis own music EQ with adjustments
@@ -60,7 +61,6 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static double g_target_mean = -45;
 //vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
-vector<double> g_speaker_dsp_factor(DSP_MAX_BANDS, 1);
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -418,12 +418,14 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 }
 
 static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const vector<string>& mic_ips, const MicWantedEQ& eqs) {
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
 	// Initialize to 0 EQ
-	vector<vector<double>> final_eqs(eqs.front().size(), vector<double>(DSP_MAX_BANDS, 0));
-	vector<vector<double>> total_linear_energy = vector<vector<double>>(speaker_ips.size(), vector<double>(DSP_MAX_BANDS, 0));
+	vector<vector<double>> final_eqs(eqs.front().size(), vector<double>(num_bands, 0));
+	vector<vector<double>> total_linear_energy = vector<vector<double>>(speaker_ips.size(), vector<double>(num_bands, 0));
 	
 	// Find total linear energy
-	for (int i = 0; i < DSP_MAX_BANDS; i++) {
+	for (int i = 0; i < num_bands; i++) {
 		// Go through microphones
 		for (size_t j = 0; j < eqs.size(); j++) {
 			// Go through speakers
@@ -438,7 +440,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 	}
 	
 	// Set weights
-	for (int i = 0; i < DSP_MAX_BANDS; i++) {
+	for (int i = 0; i < num_bands; i++) {
 		// Go through microphones
 		for (size_t j = 0; j < eqs.size(); j++) {
 			// Go through speakers
@@ -493,21 +495,19 @@ static void runFrequencyResponseScripts(const vector<string>& speakers, const ve
 	Test different levels of dB until we find a common factor
 */
 static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const vector<string>& mic_ips, int iterations) {
-	// We don't want the EQ to be normalized when running factor testing
-	auto save_current_factors = g_speaker_dsp_factor;
-	g_speaker_dsp_factor = vector<double>(DSP_MAX_BANDS, 1);
-	
 	FactorData change_factors = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	FactorData last_dbs = vector<vector<vector<vector<double>>>>(mic_ips.size(), vector<vector<vector<double>>>(speaker_ips.size()));
 	
 	double step = 3; // How much each iteration should alterate the gain
 	
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
 	for (int i = 0; i < iterations; i++) {
 		// Set EQ based on which iteration we're in
-		vector<double> eq(DSP_MAX_BANDS, (i == 0 ? 0 : step));
+		vector<double> eq(num_bands, (i == 0 ? 0 : step));
 		
 		for (size_t j = 0; j < speaker_ips.size(); j++)
-			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(eq, 0, false);
+			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(eq, 0);
 			
 		// Propagate it to clients
 		setSpeakersEQ(speaker_ips, TYPE_NEXT_EQ);
@@ -569,9 +569,6 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 		}
 	}
 	
-	// Load DSP factor settings again
-	g_speaker_dsp_factor = save_current_factors;
-	
 	return change_factors;
 }
 
@@ -592,8 +589,10 @@ double calculateSD(const vector<double>& data) {
 }
 
 static void printFactorData(const vector<FactorData>& data, const vector<string>& mic_ips, const vector<string>& speaker_ips) {
-	vector<double> final_factors = vector<double>(DSP_MAX_BANDS, 0);
-	vector<vector<double>> std_dev = vector<vector<double>>(DSP_MAX_BANDS, vector<double>());
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
+	vector<double> final_factors = vector<double>(num_bands, 0);
+	vector<vector<double>> std_dev = vector<vector<double>>(num_bands, vector<double>());
 	
 	// Print all data
 	for (auto& change_factors : data) {
@@ -625,7 +624,7 @@ static void printFactorData(const vector<FactorData>& data, const vector<string>
 	
 	vector<double> deviation;
 	
-	for (int i = 0; i < DSP_MAX_BANDS; i++) {
+	for (int i = 0; i < num_bands; i++) {
 		auto std_avk = calculateSD(std_dev.at(i));
 		
 		deviation.push_back(std_avk);
@@ -701,8 +700,8 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static vector<BandOutput> getCalibrationScore(const vector<string>& mic_ips) {
-	vector<BandOutput> boosts;
+static vector<FFTOutput> getCalibrationScore(const vector<string>& mic_ips) {
+	vector<FFTOutput> boosts;
 	
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
@@ -720,8 +719,8 @@ static vector<BandOutput> getCalibrationScore(const vector<string>& mic_ips) {
 		
 		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 		
-		auto fft_output = nac::fft(sound);
-		auto band_dbs = nac::calculate(fft_output);
+		auto fft_output = nac::doFFT(sound);
+		auto band_dbs = nac::getDecibelDifference(fft_output, g_target_mean);
 		
 		boosts.push_back(band_dbs);
 	}
@@ -729,10 +728,10 @@ static vector<BandOutput> getCalibrationScore(const vector<string>& mic_ips) {
 	return boosts;
 }
 
-static BandOutput getPinkResponse(const vector<short>& data, size_t sound_start, size_t sound_stop) {
+static FFTOutput getWhiteResponse(const vector<short>& data, size_t sound_start, size_t sound_stop) {
 	vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 	
-	return nac::calculate(nac::fft(sound));
+	return nac::doFFT(sound);
 }
 
 // From NetworkCommunication.cpp
@@ -833,8 +832,6 @@ static void moveToMATLAB(const string& timestamp, const vector<string>& mic_ips)
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
 	// Set g_dsp_factor
-	g_speaker_dsp_factor = nac::availability();
-	
 	bool run_white_noise = false;
 	
 	if (type == WHITE_NOISE)
@@ -891,11 +888,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 	Base::system().getRecordings(mic_ips);
 	
-	// See calibration score before calibrating
-	getCalibrationScore(mic_ips);
-	
-	auto timestamp = writeWhiteNoiseFiles("before");
-	
 	// Get sound level from white noise
 	auto flat_level_db = getSoundLevel(mic_ips);
 	
@@ -904,6 +896,11 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	g_target_mean = flat_level_db;
 	
+	// See calibration score before calibrating
+	getCalibrationScore(mic_ips);
+	
+	auto timestamp = writeWhiteNoiseFiles("before");
+
 	// Set test DSP gain
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
@@ -938,36 +935,49 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			size_t sound_stop = lround(sound_stop_sec * 48000.0);
 			
 			vector<double> dbs;
+			vector<double> final_eq;
 			
 			if (run_white_noise) {
-				auto sound = getPinkResponse(data, sound_start, sound_stop);
-				// TODO: Do something smart here, analyze the energies and see how the Q will affect which frequencies get boosted and so on
-				//auto& energy = sound.first;
-				dbs = sound.second;
+				auto eq_settings = Base::system().getSpeakerProfile().getSpeakerEQ();
+				
+				auto response = getWhiteResponse(data, sound_start, sound_stop);
+				auto difference = nac::getDecibelDifference(response, g_target_mean);
+				auto fit_response = nac::fitEQ(nac::toDecibel(response), eq_settings);
+				
+				// Apply profiles
+				auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+				
+				// Lower frequency resolution to fit speaker EQ
+				final_eq = nac::fitEQ(applied, eq_settings);
+				
+				// Set microphone response for this speaker
+				dbs = fit_response;
 			} else {
 				// Calculate FFT for 9 band as well
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
 				
 				for (auto& db_linear : db_linears) {
-					double db = 20 * log10(db_linear / (double)SHRT_MAX);
+					double db = 20 * log10(db_linear);
 					
 					dbs.push_back(db);
 				}
+				
+				// How much does this microphone get per frequency?
+				cout << "Microphone (" << mic_ip << ") gets from " << speaker_ips.at(i) << ":\n";
+				for (size_t j = 0; j < dbs.size(); j++)
+					cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
+				
+				// Calculate correction EQ
+				auto eq = getSoundImageCorrection(dbs, run_white_noise);
+				
+				cout << "Which gives the correction EQ of:\n";
+				for (size_t j = 0; j < eq.size(); j++)
+					cout << "Frequency " << g_frequencies.at(j) << "\t " << eq.at(j) << " dB\n";
+					
+				final_eq = eq;
 			}
 			
-			// How much does this microphone get per frequency?
-			cout << "Microphone (" << mic_ip << ") gets from " << speaker_ips.at(i) << ":\n";
-			for (size_t j = 0; j < dbs.size(); j++)
-				cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
-			
-			// Calculate correction EQ
-			auto eq = getSoundImageCorrection(dbs, run_white_noise);
-			
-			cout << "Which gives the correction EQ of:\n";
-			for (size_t j = 0; j < eq.size(); j++)
-				cout << "Frequency " << g_frequencies.at(j) << "\t " << eq.at(j) << " dB\n";
-			
-			new_eqs.push_back(eq);
+			new_eqs.push_back(final_eq);
 			
 			// DBs is vector of the current speaker with all its' frequency dBs
 			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
@@ -983,10 +993,12 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Set new EQs
 	for (size_t j = 0; j < speaker_ips.size(); j++) {
 		// Add new EQ
-		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(final_eqs.at(j), 0, true);
+		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(final_eqs.at(j), 0);
+		
+		auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
 		
 		// Say that this EQ is epic
-		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX, false);
+		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(num_bands, 0), INT_MAX);
 	}
 	
 	// Set test white noise settings
@@ -1036,4 +1048,48 @@ void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
 		Base::system().runScript(ips, vector<string>(ips.size(), enable));
 	else
 		Base::system().runScript(ips, vector<string>(ips.size(), disable));
+}
+
+template<class T>
+static T mean(const vector<T>& container) {
+	double sum = 0;
+	
+	for(const auto& element : container)
+		sum += element;
+		
+	return sum / (double)container.size();
+}
+
+void Handle::testing() {
+	try {
+		string filename = "before.wav";
+		vector<short> data;
+		WavReader::read(filename, data);
+		data = vector<short>(data.begin() + 48000 * 2, data.begin() + 48000 * 10);
+		
+		auto& speaker_profile = Base::system().getSpeakerProfile();
+		
+		auto difference = nac::getDecibelDifference(nac::doFFT(data), g_target_mean);
+		auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+		auto final_eq = nac::fitEQ(applied, speaker_profile.getSpeakerEQ());
+		
+		for (int j = 0; j < 10; j++) {
+			double mean_db = mean(final_eq);
+			
+			for (size_t i = 0; i < final_eq.size(); i++) {
+				final_eq.at(i) -= mean_db;
+				cout << "Frequency\t" << speaker_profile.getSpeakerEQ().first.at(i) << "\t:\t" << final_eq.at(i) << endl;
+			}
+			
+			for (auto& setting : final_eq) {
+				if (setting < speaker_profile.getMinEQ())
+					setting = speaker_profile.getMinEQ();
+				else if (setting > speaker_profile.getMaxEQ())
+					setting = speaker_profile.getMaxEQ();
+			}
+		}
+	} catch (...) {
+		// Testing method failed, we don't care
+		return;
+	}
 }

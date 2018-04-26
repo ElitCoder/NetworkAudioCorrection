@@ -1,12 +1,12 @@
 #include "Speaker.h"
+#include "Base.h"
+#include "System.h"
 
 #include <algorithm>
 #include <iostream>
 #include <cmath>
 
 using namespace std;
-
-extern vector<double> g_speaker_dsp_factor;
 
 const string& Speaker::getIP() const {
 	return ip_;
@@ -50,8 +50,10 @@ void Speaker::setVolume(double volume) {
 }
 
 vector<double> Speaker::getNextEQ() {
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
 	if (correction_eq_.empty())
-		return vector<double>(DSP_MAX_BANDS, 0);
+		return vector<double>(num_bands, 0);
 		
 	return correction_eq_;
 }
@@ -74,28 +76,25 @@ static T getMean(const vector<T>& container) {
 	for(const auto& element : container)
 		sum += element;
 		
-	return sum / container.size();
+	return sum / (double)container.size();
 }
 
-static double correctMaxEQ(vector<double>& eq, bool add_factor) {
+static double correctMaxEQ(vector<double>& eq) {
 	double total_mean_change = 0;
+	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
+	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
 	
 	for (int i = 0; i < 1000; i++) {
-		if (i == 1 && add_factor) {
-			for (size_t j = 0; j < eq.size(); j++)
-				eq.at(j) /= g_speaker_dsp_factor.at(j);
-		}
-		
 		double mean_db = getMean(eq);
 		
 		for (auto& setting : eq)
 			setting -= mean_db;
 		
 		for (auto& setting : eq) {
-			if (setting < DSP_MIN_EQ)
-				setting = DSP_MIN_EQ;
-			else if (setting > DSP_MAX_EQ)
-				setting = DSP_MAX_EQ;
+			if (setting < min_eq)
+				setting = min_eq;
+			else if (setting > max_eq)
+				setting = max_eq;
 		}
 		
 		total_mean_change += mean_db;
@@ -122,8 +121,10 @@ double Speaker::getBestScore() const {
 }
 
 vector<double> Speaker::getBestEQ() {
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
 	if (current_best_eq_.empty())
-		return vector<double>(DSP_MAX_BANDS, 0);
+		return vector<double>(num_bands, 0);
 		
 	return current_best_eq_;
 }
@@ -172,7 +173,7 @@ static vector<T> vectorDifference(const vector<T>& first, const vector<T>& secon
 }
 
 // Returns current EQ
-void Speaker::setNextEQ(const vector<double>& eq, double score, bool add_factor) {
+void Speaker::setNextEQ(const vector<double>& eq, double score) {
 	printEQ(ip_, correction_eq_, "current");
 	printEQ(ip_, eq, "input");
 	
@@ -183,13 +184,15 @@ void Speaker::setNextEQ(const vector<double>& eq, double score, bool add_factor)
 		best_speaker_volume_ = correction_volume_;
 	}
 	
+	auto num_bands = Base::system().getSpeakerProfile().getNumEQBands();
+	
 	if (correction_eq_.empty())
-		correction_eq_ = vector<double>(DSP_MAX_BANDS, 0);
+		correction_eq_ = vector<double>(num_bands, 0);
 		
 	for (size_t i = 0; i < eq.size(); i++)
 		correction_eq_.at(i) += eq.at(i);
 	
-	correction_volume_ = volume_ + correctMaxEQ(correction_eq_, add_factor);
+	correction_volume_ = volume_ + correctMaxEQ(correction_eq_);
 	
 	printEQ(ip_, correction_eq_, "next");
 	

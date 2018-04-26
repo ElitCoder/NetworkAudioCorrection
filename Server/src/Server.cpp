@@ -4,6 +4,8 @@
 #include "Packet.h"
 #include "Connection.h"
 #include "Config.h"
+#include "Profile.h"
+#include "System.h"
 
 #include <iostream>
 #include <algorithm>
@@ -21,7 +23,8 @@ enum {
 	PACKET_SET_BEST_EQ,
 	PACKET_SET_EQ_STATUS,
 	PACKET_RESET_EVERYTHING,
-	PACKET_SET_SOUND_EFFECTS
+	PACKET_SET_SOUND_EFFECTS,
+	PACKET_TESTING
 };
 
 extern Connection* g_current_connection;
@@ -169,6 +172,9 @@ static void handle(Connection& connection, Packet& input_packet) {
 			break;
 		}
 		
+		case PACKET_TESTING: Handle::testing();
+			break;
+		
 		default:	cout << "Debug: got some random packet, answering with empty packet\n";
 					cout << "Debug: header " << header << endl;
 	}
@@ -203,6 +209,23 @@ static void start() {
 }
 
 int main() {
+	// Set profiles here for now
+	Profile speaker;
+	speaker.setCutoffs(60, 20000);
+	
+	Profile microphone;
+	microphone.setCutoffs(20, 20000);
+	
+	vector<double> frequencies = { 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
+	double q = 1;
+	
+	speaker.setSpeakerEQ(frequencies, q);
+	speaker.setMaxEQ(12);
+	speaker.setMinEQ(-12);
+	
+	Base::system().setSpeakerProfile(speaker);
+	Base::system().setMicrophoneProfile(microphone);
+	
 	// Initialize curlpp
 	curlpp::initialize();
 	
