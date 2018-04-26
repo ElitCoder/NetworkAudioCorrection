@@ -507,7 +507,7 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 		vector<double> eq(DSP_MAX_BANDS, (i == 0 ? 0 : step));
 		
 		for (size_t j = 0; j < speaker_ips.size(); j++)
-			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(eq, 0);
+			Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(eq, 0, false);
 			
 		// Propagate it to clients
 		setSpeakersEQ(speaker_ips, TYPE_NEXT_EQ);
@@ -663,8 +663,8 @@ static double getSoundLevel(const vector<string>& mic_ips) {
 		auto idle = Base::config().get<int>("idle_time");
 		auto play = Base::config().get<int>("play_time");
 		
-		double sound_start_sec = static_cast<double>(idle) + 1;
-		double sound_stop_sec = sound_start_sec + play / 2.0;
+		double sound_start_sec = static_cast<double>(idle) * 2;
+		double sound_stop_sec = sound_start_sec + play - idle * 2;
 		size_t sound_start = lround(sound_start_sec * 48000.0);
 		size_t sound_stop = lround(sound_stop_sec * 48000.0);
 		
@@ -713,8 +713,8 @@ static vector<BandOutput> getCalibrationScore(const vector<string>& mic_ips) {
 		auto idle = Base::config().get<int>("idle_time");
 		auto play = Base::config().get<int>("play_time");
 		
-		double sound_start_sec = static_cast<double>(idle) + 1;
-		double sound_stop_sec = sound_start_sec + play / 2.0;
+		double sound_start_sec = static_cast<double>(idle) * 2;
+		double sound_stop_sec = sound_start_sec + play - idle * 2;
 		size_t sound_start = lround(sound_start_sec * 48000.0);
 		size_t sound_stop = lround(sound_stop_sec * 48000.0);
 		
@@ -852,8 +852,10 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	disableAudioSystem(all_ips);
 	
 	// Send test files to speakers
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", false);
-	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", false);
+	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", true);
+	
+	if (!run_white_noise)
+		Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", true);
 	
 	// Find correction factor
 	if (factor_calibration) {
@@ -930,8 +932,8 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		vector<vector<double>> new_eqs;
 		
 		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			double sound_start_sec = static_cast<double>(idle + i * (play + idle)) + 1;
-			double sound_stop_sec = sound_start_sec + play / 2.0;
+			double sound_start_sec = static_cast<double>(idle) * 2 + (i * (play + idle));
+			double sound_stop_sec = sound_start_sec + play - idle * 2;
 			size_t sound_start = lround(sound_start_sec * 48000.0);
 			size_t sound_stop = lround(sound_stop_sec * 48000.0);
 			
@@ -981,10 +983,10 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Set new EQs
 	for (size_t j = 0; j < speaker_ips.size(); j++) {
 		// Add new EQ
-		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(final_eqs.at(j), 0);
+		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(final_eqs.at(j), 0, true);
 		
 		// Say that this EQ is epic
-		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX);
+		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(DSP_MAX_BANDS, 0), INT_MAX, false);
 	}
 	
 	// Set test white noise settings

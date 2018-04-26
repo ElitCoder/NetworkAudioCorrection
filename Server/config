@@ -4,13 +4,13 @@ port: 10200
 # Files
 goertzel: testTone.wav
 sound_image_file_short: 9_freq_3s.wav
-white_noise: white_noise_3s.wav
+white_noise: white_noise_60s.wav
 
 # Testing
 no_scripts: 0
 
 # Script settings
-play_time: 3
+play_time: 60
 idle_time: 1
 
 # Localization3D (degrees and meters)

@@ -43,7 +43,7 @@ public:
 	
 	// EQ setters
 	void clearAllEQs();
-	void setNextEQ(const std::vector<double>& eq, double score);
+	void setNextEQ(const std::vector<double>& eq, double score, bool add_factor);
 	void setNextVolume();
 	void setBestVolume();
 	

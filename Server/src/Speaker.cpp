@@ -77,11 +77,11 @@ static T getMean(const vector<T>& container) {
 	return sum / container.size();
 }
 
-static double correctMaxEQ(vector<double>& eq) {
+static double correctMaxEQ(vector<double>& eq, bool add_factor) {
 	double total_mean_change = 0;
 	
 	for (int i = 0; i < 1000; i++) {
-		if (i == 1) {
+		if (i == 1 && add_factor) {
 			for (size_t j = 0; j < eq.size(); j++)
 				eq.at(j) /= g_speaker_dsp_factor.at(j);
 		}
@@ -172,7 +172,7 @@ static vector<T> vectorDifference(const vector<T>& first, const vector<T>& secon
 }
 
 // Returns current EQ
-void Speaker::setNextEQ(const vector<double>& eq, double score) {
+void Speaker::setNextEQ(const vector<double>& eq, double score, bool add_factor) {
 	printEQ(ip_, correction_eq_, "current");
 	printEQ(ip_, eq, "input");
 	
@@ -189,7 +189,7 @@ void Speaker::setNextEQ(const vector<double>& eq, double score) {
 	for (size_t i = 0; i < eq.size(); i++)
 		correction_eq_.at(i) += eq.at(i);
 	
-	correction_volume_ = volume_ + correctMaxEQ(correction_eq_);
+	correction_volume_ = volume_ + correctMaxEQ(correction_eq_, add_factor);
 	
 	printEQ(ip_, correction_eq_, "next");
 	
