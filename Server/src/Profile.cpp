@@ -7,8 +7,9 @@ void Profile::setCutoffs(double low, double high) {
 	high_cutoff_ = high;
 }
 
-void Profile::setSteep(double steep) {
-	steep_ = steep;
+void Profile::setSteep(double low, double high) {
+	steep_low_ = low;
+	steep_high_ = high;
 }
 
 double Profile::getLowCutOff() const {
@@ -19,8 +20,12 @@ double Profile::getHighCutOff() const {
 	return high_cutoff_;
 }
 
-double Profile::getSteep() const {
-	return steep_;
+double Profile::getSteepLow() const {
+	return steep_low_;
+}
+
+double Profile::getSteepHigh() const {
+	return steep_high_;
 }
 
 void Profile::setSpeakerEQ(const vector<double>& frequencies, double q) {

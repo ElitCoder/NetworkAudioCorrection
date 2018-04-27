@@ -700,9 +700,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static vector<FFTOutput> getCalibrationScore(const vector<string>& mic_ips) {
-	vector<FFTOutput> boosts;
-	
+static void showCalibrationScore(const vector<string>& mic_ips) {
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -720,12 +718,10 @@ static vector<FFTOutput> getCalibrationScore(const vector<string>& mic_ips) {
 		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 		
 		auto fft_output = nac::doFFT(sound);
-		auto band_dbs = nac::getDecibelDifference(fft_output, g_target_mean);
+		//auto band_dbs = nac::getDecibelDifference(fft_output, g_target_mean);
 		
-		boosts.push_back(band_dbs);
+		nac::fitBands(nac::toDecibel(fft_output), Base::system().getSpeakerProfile().getSpeakerEQ());
 	}
-	
-	return boosts;
 }
 
 static FFTOutput getWhiteResponse(const vector<short>& data, size_t sound_start, size_t sound_stop) {
@@ -897,7 +893,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	//g_target_mean = flat_level_db;
 	
 	// See calibration score before calibrating
-	getCalibrationScore(mic_ips);
+	showCalibrationScore(mic_ips);
 	
 	auto timestamp = writeWhiteNoiseFiles("before");
 
@@ -942,13 +938,13 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				
 				auto response = getWhiteResponse(data, sound_start, sound_stop);
 				auto difference = nac::getDecibelDifference(response, g_target_mean);
-				auto fit_response = nac::fitEQ(nac::toDecibel(response), eq_settings);
+				auto fit_response = nac::fitBands(nac::toDecibel(response), eq_settings);
 				
 				// Apply profiles
 				auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
 				
 				// Lower frequency resolution to fit speaker EQ
-				final_eq = nac::fitEQ(applied, eq_settings);
+				final_eq = nac::getEQ(applied, eq_settings);
 				
 				// Set microphone response for this speaker
 				dbs = fit_response;
@@ -1009,7 +1005,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	getCalibrationScore(mic_ips);
+	showCalibrationScore(mic_ips);
 	
 	writeWhiteNoiseFiles("after", timestamp);
 	writeEQSettings("after", timestamp, speaker_ips);
@@ -1061,7 +1057,7 @@ static T mean(const vector<T>& container) {
 }
 
 void Handle::testing() {
-	try {
+	//try {
 		string filename = "before.wav";
 		vector<short> data;
 		WavReader::read(filename, data);
@@ -1071,7 +1067,7 @@ void Handle::testing() {
 		
 		auto difference = nac::getDecibelDifference(nac::doFFT(data), g_target_mean);
 		auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
-		auto final_eq = nac::fitEQ(applied, speaker_profile.getSpeakerEQ());
+		auto final_eq = nac::getEQ(applied, speaker_profile.getSpeakerEQ());
 		
 		#if 0
 		for (int j = 0; j < 10; j++) {
@@ -1090,8 +1086,8 @@ void Handle::testing() {
 			}
 		}
 		#endif
-	} catch (...) {
+	//} catch (...) {
 		// Testing method failed, we don't care
-		return;
-	}
+		//return;
+	//}
 }

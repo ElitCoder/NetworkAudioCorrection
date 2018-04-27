@@ -8,11 +8,12 @@
 class Profile {
 public:
 	void setCutoffs(double low, double high);
-	void setSteep(double steep);
+	void setSteep(double low, double high);
 	
 	double getLowCutOff() const;
 	double getHighCutOff() const;
-	double getSteep() const;
+	double getSteepLow() const;
+	double getSteepHigh() const;
 	
 	std::pair<std::vector<double>, double> getSpeakerEQ() const;
 	void setSpeakerEQ(const std::vector<double>& frequencies, double q);
@@ -33,8 +34,8 @@ private:
 	double low_cutoff_	= 0;
 	double high_cutoff_	= 0;
 	
-	// Steep -12 dB per octave outside of cut-offs
-	double steep_		= -96;
+	double steep_low_	= -96;
+	double steep_high_	= -256;
 	
 	double dsp_max_eq_	= 0;
 	double dsp_min_eq_	= 0;

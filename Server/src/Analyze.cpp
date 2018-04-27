@@ -10,10 +10,6 @@
 
 using namespace std;
 
-// SigPack
-using namespace arma;
-using namespace sp;
-
 #if 0
 static const vector<int> band_limits = {	44,		88,
 											88,		177,
@@ -97,6 +93,48 @@ static int getBandIndex(double frequency, const vector<double>& limits) {
 	return -1;
 }
 
+static int getClosestIndex(double frequency, const vector<double>& container) {
+	double closest = INT_MAX;
+	int closest_index = -1;
+	
+	for (size_t i = 0; i < container.size(); i++) {
+		double distance = abs(container.at(i) - frequency);
+		
+		if (distance < closest) {
+			closest = distance;
+			closest_index = i;
+		}
+	}
+	
+	return closest_index;
+}
+
+#if 0
+static double correctMaxEQ(vector<double>& eq) {
+	double total_mean_change = 0;
+	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
+	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
+	
+	for (int i = 0; i < 1000; i++) {
+		double mean_db = mean(eq);
+		
+		for (auto& setting : eq)
+			setting -= mean_db;
+		
+		for (auto& setting : eq) {
+			if (setting < min_eq)
+				setting = min_eq;
+			else if (setting > max_eq)
+				setting = max_eq;
+		}
+		
+		total_mean_change += mean_db;
+	}
+	
+	return total_mean_change;
+}
+#endif
+
 namespace nac {
 	FFTOutput doFFT(const vector<short>& samples) {
 		vector<double> in;
@@ -105,7 +143,7 @@ namespace nac {
 			in.push_back((double)sample / SHRT_MAX);
 		
 		const int N = 8192;
-		vec y = arma::abs(sp::pwelch(vec(in), N, N / 2));
+		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
 		
@@ -163,7 +201,8 @@ namespace nac {
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
 		auto low = max(speaker_profile.getLowCutOff(), microphone_profile.getLowCutOff());
 		auto high = min(speaker_profile.getHighCutOff(), microphone_profile.getHighCutOff());
-		auto steep = max(speaker_profile.getSteep(), microphone_profile.getSteep());
+		auto steep_low = max(speaker_profile.getSteepLow(), microphone_profile.getSteepLow());
+		auto steep_high = max(speaker_profile.getSteepHigh(), microphone_profile.getSteepHigh());
 		
 		FFTOutput output = input;
 		
@@ -182,14 +221,14 @@ namespace nac {
 			// How steep should this be?
 			if (frequency < low) {
 				double steps = log2(low / frequency);
-				double attenuation = steps * steep;
+				double attenuation = steps * steep_low;
 				
 				db += attenuation;
 				
 				//cout << "Attenuated " << frequency << " " << attenuation << endl;
 			} else if (frequency > high) {
 				double steps = log2(frequency / high);
-				double attenuation = steps * steep;
+				double attenuation = steps * steep_high;
 				
 				db += attenuation;
 				
@@ -210,7 +249,113 @@ namespace nac {
 		return output;	
 	}
 	
-	vector<double> fitEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
+	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
+		auto& eq_frequencies = eq_settings.first;
+		auto& frequencies = input.first;
+		auto& q = eq_settings.second;
+		
+		auto fft_iterative = input;
+		vector<double> final_eqs(fft_iterative.second.size(), 0);
+		
+		for (int i = 0; i < 10; i++) {
+			fitBands(fft_iterative, eq_settings);
+			
+			vector<double> window_start_index;
+			vector<vector<double>> windows;
+			
+			for (auto& frequency : eq_frequencies) {
+				//auto output = fitBands(fft_iterative, eq_settings);
+				
+				double bw = frequency /  q;
+				double f0 = frequency;
+				double f_low = f0 - bw / 2;
+				double f_high = f0 + bw / 2;
+				
+				// Get indicies
+				auto f0_index = getClosestIndex(f0, frequencies);
+				auto f_low_index = getClosestIndex(f_low, frequencies);
+				auto f_high_index = getClosestIndex(f_high, frequencies);
+				
+				double bandwidth_index = mean(vector<int>({ f0_index - f_low_index, f_high_index - f0_index }));
+				int tap_size = lround(bandwidth_index * 4.0);
+				
+				cout << "frequency " << frequency << endl;
+				cout << "f0 " << f0 << endl;
+				cout << "f_low " << f_low << endl;
+				cout << "f_high " << f_high << endl;
+				cout << "f0_index " << f0_index << endl;
+				cout << "f_low_index " << f_low_index << endl;
+				cout << "f_high_index " << f_high_index << endl;
+				cout << "tap_size " << tap_size << endl;
+				
+				auto sp_hamming = sp::hamming(tap_size);
+				vector<double> values;
+				
+				for (auto& value : sp_hamming)
+					values.push_back(value);
+					
+				auto dbs = toDecibel({ vector<double>(), values });
+				values = dbs.second;
+					
+				auto adding = *min(values.begin(), values.end()) * (-1);
+				
+				for (size_t j = 0; j < values.size(); j++) {
+					auto& value = values.at(j);
+					
+					value += adding;
+					
+					if (f_low_index + j >= fft_iterative.second.size())
+						break;
+					
+					value *= (fft_iterative.second.at(f_low_index + j) / adding);
+				}
+				
+				windows.push_back(values);
+				window_start_index.push_back(f_low_index);
+			}
+			
+			// Add EQ to input
+			for (size_t j = 0; j < windows.size(); j++) {
+				auto& start = window_start_index.at(j);
+				
+				for (size_t k = 0; k < windows.at(j).size(); k++) {
+					if (start + k >= fft_iterative.second.size())
+						break;
+						
+					fft_iterative.second.at(start + k) -= windows.at(j).at(k);
+					final_eqs.at(start + k) += windows.at(j).at(k);
+				}
+			}
+			
+			fitBands(fft_iterative, eq_settings);
+		}
+		
+		cout << "Final EQs: ";
+		for (auto& value : final_eqs)
+			cout << value << " ";
+		cout << endl;
+		
+		fft_iterative.second = final_eqs;
+		
+		fitBands(fft_iterative, eq_settings);
+		
+		#if 0
+		auto hamming_window = sp::hamming(256);
+		vector<double> values;
+		
+		for (auto& value : hamming_window)
+			values.push_back(value);
+			
+		auto dbs = toDecibel({ vector<double>(), values });
+		
+		for (auto& db : dbs.second)
+			cout << "DB " << db << endl;
+		#endif
+		
+		return fitBands(fft_iterative, eq_settings);
+	}
+	
+	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
 		auto& eq_frequencies = eq_settings.first;
 		//auto& q = eq_settings.second;
 		
@@ -245,7 +390,7 @@ namespace nac {
 				continue;
 				
 			energy.at(index) += dbs.at(i);
-			num.at(index)++;	
+			num.at(index)++;
 		}
 		
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
@@ -255,6 +400,9 @@ namespace nac {
 			
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
 		}
+		
+		auto db_std_dev = calculateSD(energy);
+		cout << "db_std_dev " << db_std_dev << endl;
 		
 		return energy;
 	}

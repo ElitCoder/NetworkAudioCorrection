@@ -15,7 +15,8 @@ namespace nac {
 	FFTOutput getDecibelDifference(const FFTOutput& input, double target_db);
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile);
 	FFTOutput toDecibel(const FFTOutput& input);
-	std::vector<double> fitEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
+	std::vector<double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
+	std::vector<double> getEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
 }
 
 #endif
