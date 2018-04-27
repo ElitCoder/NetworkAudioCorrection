@@ -4,17 +4,21 @@ close all
 [x, fsx] = audioread('before.wav');
 [y, fsy] = audioread('after.wav');
 
+sound_start_sec = 2;
+sound_stop_sec = 30;
+
 % cut silence
-x = x(fsx * 2 : fsx * 3.5);
-y = y(fsy * 2 : fsy * 3.5);
+x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
+y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
 
 % create spectrum
-[Px, fx] = pwelch(x, [], [], length(x), fsx);
-[Py, fy] = pwelch(y, [], [], length(y), fsy);
+N = 8192;
+[Px, fx] = pwelch(x, [], [], N, fsx);
+[Py, fy] = pwelch(y, [], [], N, fsy);
 powPx = pow2db(Px);
 powPy = pow2db(Py);
 
-xLin = 1:0.01:4.5;
+xLin = 0:0.015:log10(length(fx));
 for i = 1:length(xLin)
     xLog(i) = round(10^xLin(i));
 end
@@ -33,8 +37,9 @@ end
 fy = fy(xLog(2:length(xLog)));
 powPy = newPowPy;
 
+low_index = find(fx > 44);
 min_total = min([min(powPx), min(powPy)]) - 3;
-max_total = max([max(powPx(2:length(powPx))), max(powPy(2:length(powPx)))]) + 3;
+max_total = max([max(powPx(low_index)), max(powPy(low_index))]) + 3;
 
 x_mean = mean(powPx);
 y_mean = mean(powPy);

@@ -226,6 +226,9 @@ int main() {
 	Base::system().setSpeakerProfile(speaker);
 	Base::system().setMicrophoneProfile(microphone);
 	
+	// For testing
+	//Handle::testing();
+	
 	// Initialize curlpp
 	curlpp::initialize();
 	

@@ -154,7 +154,7 @@ namespace nac {
 			auto& db = gain_db.at(i);
 			difference_db.push_back(target_db - db);
 			
-			cout << "Frequency difference\t" << frequencies.at(i) << "\t:\t" << difference_db.back() << endl;
+			//cout << "Frequency difference\t" << frequencies.at(i) << "\t:\t" << difference_db.back() << endl;
 		}
 			
 		return { frequencies, difference_db };
@@ -186,14 +186,14 @@ namespace nac {
 				
 				db += attenuation;
 				
-				cout << "Attenuated " << frequency << " " << attenuation << endl;
+				//cout << "Attenuated " << frequency << " " << attenuation << endl;
 			} else if (frequency > high) {
 				double steps = log2(frequency / high);
 				double attenuation = steps * steep;
 				
 				db += attenuation;
 				
-				cout << "Attenuated " << frequency << " " << attenuation << endl;
+				//cout << "Attenuated " << frequency << " " << attenuation << endl;
 			}
 		}
 			

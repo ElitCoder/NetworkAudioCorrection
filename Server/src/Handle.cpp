@@ -397,7 +397,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_FLAT_EQ: dsp_gain = 0;
+			case TYPE_FLAT_EQ: dsp_gain = -12;
 				break;
 				
 			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
@@ -894,7 +894,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	cout << "White noise sound level: " << flat_level_db << endl;
 	cout << "Setting target mean to " << flat_level_db << endl;
 	
-	g_target_mean = flat_level_db;
+	//g_target_mean = flat_level_db;
 	
 	// See calibration score before calibrating
 	getCalibrationScore(mic_ips);
@@ -1065,7 +1065,7 @@ void Handle::testing() {
 		string filename = "before.wav";
 		vector<short> data;
 		WavReader::read(filename, data);
-		data = vector<short>(data.begin() + 48000 * 2, data.begin() + 48000 * 10);
+		data = vector<short>(data.begin() + 48000 * 2, data.begin() + 48000 * 30);
 		
 		auto& speaker_profile = Base::system().getSpeakerProfile();
 		
@@ -1073,6 +1073,7 @@ void Handle::testing() {
 		auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
 		auto final_eq = nac::fitEQ(applied, speaker_profile.getSpeakerEQ());
 		
+		#if 0
 		for (int j = 0; j < 10; j++) {
 			double mean_db = mean(final_eq);
 			
@@ -1088,6 +1089,7 @@ void Handle::testing() {
 					setting = speaker_profile.getMaxEQ();
 			}
 		}
+		#endif
 	} catch (...) {
 		// Testing method failed, we don't care
 		return;
