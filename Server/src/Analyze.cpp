@@ -93,6 +93,7 @@ static int getBandIndex(double frequency, const vector<double>& limits) {
 	return -1;
 }
 
+#if 0
 static int getClosestIndex(double frequency, const vector<double>& container) {
 	double closest = INT_MAX;
 	int closest_index = -1;
@@ -108,6 +109,7 @@ static int getClosestIndex(double frequency, const vector<double>& container) {
 	
 	return closest_index;
 }
+#endif
 
 #if 0
 static double correctMaxEQ(vector<double>& eq) {
@@ -142,7 +144,7 @@ namespace nac {
 		for (auto& sample : samples)
 			in.push_back((double)sample / SHRT_MAX);
 		
-		const int N = 8192;
+		const int N = 4096;
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
@@ -207,11 +209,11 @@ namespace nac {
 		FFTOutput output = input;
 		
 		// Actually N / 2
-		const int N = input.first.size();
+		//const int N = input.first.size();
 		auto& frequencies = output.first;
 		auto& dbs = output.second;
 		
-		vector<double> graph(N, 0);
+		//vector<double> graph(N, 0);
 		
 		// Set cutoffs to 0 and everything outside to steep * length
 		for (size_t i = 0; i < frequencies.size(); i++) {
@@ -234,6 +236,8 @@ namespace nac {
 				
 				//cout << "Attenuated " << frequency << " " << attenuation << endl;
 			}
+			
+			//cout << frequency << " " << db << endl;
 		}
 			
 		return output;
@@ -249,7 +253,8 @@ namespace nac {
 		return output;	
 	}
 	
-	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
+	#if 0
+	FFTOutput applyEQ(const FFTOutput& input, const vector<double>& set_eq, const pair<vector<double>, double>& eq_settings) {
 		auto& eq_frequencies = eq_settings.first;
 		auto& frequencies = input.first;
 		auto& q = eq_settings.second;
@@ -257,17 +262,189 @@ namespace nac {
 		FFTOutput fft_iterative = input;
 		vector<double> final_eqs(fft_iterative.second.size(), 0);
 		
-		for (int i = 0; i < 1000; i++) {
-			auto output = fitBands(fft_iterative, eq_settings);
-			
+		for (int i = 0; i < 1; i++) {
+			//auto output = fitBands(fft_iterative, eq_settings);
+			auto output = set_eq;
 			vector<int> window_start_index;
-			vector<pair<vector<double>, bool>> windows;
+			vector<vector<double>> windows;
 			
 			for (size_t k = 0; k < eq_frequencies.size(); k++) {
-				//auto output = fitBands(fft_iterative, eq_settings);
 				auto frequency = eq_frequencies.at(k);
 				
-				double bw = frequency /  q;
+				double f0 = frequency;
+				double ratio = (1.0 + sqrt(5.0)) / 2.0;
+				double f_low = f0 * q / ratio;
+				double f_high = f0 / q * ratio;
+				
+				// Get indicies
+				auto f0_index = getClosestIndex(f0, frequencies);
+				auto f_low_index = getClosestIndex(f_low, frequencies);
+				auto f_high_index = getClosestIndex(f_high, frequencies);
+				
+				//double f_lowest = abs(output.at(k) / 3);
+				
+				double bandwidth_index = mean(vector<int>({ f0_index - f_low_index, f_high_index - f0_index }));
+				int tap_size = lround(bandwidth_index * 4.0);
+				
+				auto sp_hamming = sp::hann(tap_size);
+				vector<double> values;
+				
+				for (auto& value : sp_hamming)				
+					values.push_back(value);
+								
+				bool is_negative = false;
+				
+				if (output.at(k) < 0)
+					is_negative = true;
+				
+				for (size_t j = 0; j < values.size(); j++) {
+					auto& value = values.at(j);
+					
+					double mult = value;
+					double boost_db = output.at(k);
+					double linear_value = pow(10, boost_db / 10);
+					
+					if (boost_db < 0)
+						value = linear_value / value;
+					else
+						value *= linear_value;
+					
+					value = 10 * log10(value);
+					
+					if (value < 0 && !is_negative)
+						value = 0;
+					else if (value > 0 && is_negative)
+						value = 0;	
+					//cout << f0 << " value  "<< value << " mult " << mult << " linear " << linear_value <<  endl;
+				}
+				
+				//cout << endl;
+				
+				windows.push_back(values);
+				window_start_index.push_back(f_low_index);
+			}
+			
+			vector<double> magnitudes_db(fft_iterative.second.size(), 0);
+			
+			for (size_t j = 0; j < windows.size(); j++) {
+				auto& start = window_start_index.at(j);
+				
+				for (size_t k = 0; k < windows.at(j).size(); k++) {
+					if (start + k >= magnitudes_db.size())
+						break;
+					
+					//magnitudes_db.at(start + k) = //windows.
+					//magnitudes_sign.at(start + k) = windows.at(j).second;
+					//magnitudes_db.at(start + k) += windows.at(j).first.at(k);
+					
+					auto& original_db = magnitudes_db.at(start + k);
+					auto& adding_db = windows.at(j).at(k);
+					
+					if (original_db * adding_db > 0) {
+						// Both below zero, abs them and combine incoherent sound sources as negative
+						double current = pow(10, abs(original_db) / 10);
+						double adding = pow(10, abs(adding_db) / 10);
+						
+						original_db = 10 * log10(current + adding) * (original_db < 0 ? (-1) : 1);
+					} else {
+						original_db += adding_db;
+					}
+					
+					//original_db += adding_db;
+					
+					#if 0
+					if (magnitudes_set.at(start + k)) {
+						double current = pow(10, magnitudes_db.at(start + k) / 10);
+						double adding = pow(10, windows.at(j).first.at(k) / 10);
+						
+						magnitudes_db.at(start + k) = 10 * log10(current + adding);
+					} else {
+						magnitudes_db.at(start + k) = windows.at(j).first.at(k);
+						magnitudes_set.at(start + k) = true;
+					}
+					#endif
+					
+					/*
+					// is_negative
+					if (windows.at(j).second)
+						magnitudes_db.at(start + k) += windows.at(j).first.at(k);
+					else
+						magnitudes_db.at(start + k) -= windows.at(j).first.at(k);
+					*/
+				}
+				
+			}
+			
+			for (size_t j = 0; j < magnitudes_db.size(); j++) {
+				fft_iterative.second.at(j) -= magnitudes_db.at(j);
+				final_eqs.at(j) += magnitudes_db.at(j);
+			}
+			
+			//fitBands(fft_iterative, eq_settings);
+		}
+		
+		#if 0
+		fft_iterative.second = final_eqs;
+		fitBands(fft_iterative, eq_settings);
+		
+		return fitBands(input, eq_settings);
+		#endif
+		
+		return fft_iterative;
+	}
+	#endif
+	
+	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
+		return fitBands(input, eq_settings);
+		
+		#if 0
+		vector<double> current_eq(eq_settings.first.size(), 0);
+		FFTOutput last;
+		
+		for (int i = 0; i < 10; i++) {
+			for (size_t i = 0; i < current_eq.size(); i++) {
+				cout << "Frequency\t" << eq_settings.first.at(i) << "\t:\t" << current_eq.at(i) << endl;
+			}
+			
+			auto answer = applyEQ(input, current_eq, eq_settings);
+			auto fitted = fitBands(answer, eq_settings);
+			
+			for (size_t j = 0; j < current_eq.size(); j++)
+				current_eq.at(j) += fitted.at(j) / 10.0;
+				
+			auto db_std_dev = calculateSD(fitted);
+			cout << "db_std_dev " << db_std_dev << endl;
+			
+			if (db_std_dev < 1e-04)
+				break;
+		}
+		
+		cout << "Original:\n";
+		fitBands(input, eq_settings);
+		cout << "Simulated:\n";
+		
+		for (size_t i = 0; i < current_eq.size(); i++) {
+			cout << "Frequency\t" << eq_settings.first.at(i) << "\t:\t" << current_eq.at(i) << endl;
+		}
+		
+		#if 0
+		auto& eq_frequencies = eq_settings.first;
+		auto& frequencies = input.first;
+		auto& q = eq_settings.second;
+		
+		FFTOutput fft_iterative = input;
+		vector<double> final_eqs(fft_iterative.second.size(), 0);
+		
+		for (int i = 0; i < 100; i++) {
+			auto output = fitBands(fft_iterative, eq_settings);
+			//vector<double> output(9, 6.0);
+			
+			vector<int> window_start_index;
+			vector<vector<double>> windows;
+			
+			for (size_t k = 0; k < eq_frequencies.size(); k++) {
+				auto frequency = eq_frequencies.at(k);
+				
 				double f0 = frequency;
 				double ratio = (1.0 + sqrt(5.0)) / 2.0;
 				double f_low = f0 * q / ratio;
@@ -296,17 +473,25 @@ namespace nac {
 				for (size_t j = 0; j < values.size(); j++) {
 					auto& value = values.at(j);
 					
-					//cout << "value before " << value << endl;
-					double boost_db = abs(output.at(k));
-					double linear_value = pow(10, boost_db / 20);
-					value = sqrt(value);
-					value *= linear_value;
-					value = 20 * log10(value);
-					if (value < 0)
+					double boost_db = output.at(k);
+					double linear_value = pow(10, boost_db / 10);
+					
+					if (boost_db < 0)
+						value = linear_value / value;
+					else
+						value *= linear_value;
+					
+					value = 10 * log10(value);
+					
+					if (value < 0 && !is_negative)
 						value = 0;
+					else if (value > 0 && is_negative)
+						value = 0;
+						
+					//cout << "value  "<< value << endl;
 				}
 				
-				windows.push_back({ values, !is_negative });
+				windows.push_back(values);
 				window_start_index.push_back(f_low_index);
 			}
 			
@@ -315,107 +500,64 @@ namespace nac {
 			for (size_t j = 0; j < windows.size(); j++) {
 				auto& start = window_start_index.at(j);
 				
-				for (size_t k = 0; k < windows.at(j).first.size(); k++) {
-					if (start + k >= fft_iterative.second.size())
+				for (size_t k = 0; k < windows.at(j).size(); k++) {
+					if (start + k >= magnitudes_db.size())
 						break;
-
+					
+					//magnitudes_db.at(start + k) = //windows.
+					//magnitudes_sign.at(start + k) = windows.at(j).second;
+					//magnitudes_db.at(start + k) += windows.at(j).first.at(k);
+					
+					auto& original_db = magnitudes_db.at(start + k);
+					auto& adding_db = windows.at(j).at(k);
+					
+					if (original_db * adding_db > 0) {
+						// Both below zero, abs them and combine incoherent sound sources as negative
+						double current = pow(10, abs(original_db) / 10);
+						double adding = pow(10, abs(adding_db) / 10);
+						
+						original_db = 10 * log10(current + adding) * (original_db < 0 ? (-1) : 1);
+					} else {
+						original_db += adding_db;
+					}
+					
+					#if 0
+					if (magnitudes_set.at(start + k)) {
+						double current = pow(10, magnitudes_db.at(start + k) / 10);
+						double adding = pow(10, windows.at(j).first.at(k) / 10);
+						
+						magnitudes_db.at(start + k) = 10 * log10(current + adding);
+					} else {
+						magnitudes_db.at(start + k) = windows.at(j).first.at(k);
+						magnitudes_set.at(start + k) = true;
+					}
+					#endif
+					
+					/*
+					// is_negative
 					if (windows.at(j).second)
 						magnitudes_db.at(start + k) += windows.at(j).first.at(k);
 					else
 						magnitudes_db.at(start + k) -= windows.at(j).first.at(k);
+					*/
 				}
 				
 			}
-			
-			// Convert to dB
-			//for (auto& db : magnitudes_db)
-			//	db = 20 * log10(db);
 			
 			for (size_t j = 0; j < magnitudes_db.size(); j++) {
-				if (magnitudes_db.at(j) <= 0) {
-					fft_iterative.second.at(j) += 20 * log10(abs(magnitudes_db.at(j)));
-					final_eqs.at(j) -= 20 * log10(abs(magnitudes_db.at(j)));
-				} else {
-					fft_iterative.second.at(j) -= 20 * log10(magnitudes_db.at(j));
-					final_eqs.at(j) += 20 * log10(abs(magnitudes_db.at(j)));
-				}
-					
-				
-				
-				#if 0
-				//cout << j << endl;
-				//cout << fft_iterative.second.at(j) << endl;
-				
-				auto& iterative_db = fft_iterative.second.at(j);
-				//cout << iterative_db << endl;
-				//exit(1);
-				double iterative_linear = pow(10, iterative_db / 20);
-				auto& final_db = final_eqs.at(j);
-				double final_linear = pow(10, final_db / 20);
-				
-				//cout << "iterative " << iterative_linear << endl;
-
-				iterative_linear -= magnitudes_db.at(j);
-				final_linear += magnitudes_db.at(j);
-				
-				
-				
-				iterative_db = 20 * log10(iterative_linear);
-				final_db = 20 * log10(final_linear);
-				
-				if (isnan(iterative_db)) {
-					cout << "iterative " << magnitudes_db.at(j) << endl;
-					exit(1);
-				}
-				
-				//fft_iterative.second.at(j) -= magnitudes_db.at(j);
-				//final_eqs.at(j) += magnitudes_db.at(j);
-				#endif
+				fft_iterative.second.at(j) -= magnitudes_db.at(j);
+				final_eqs.at(j) += magnitudes_db.at(j);
 			}
-			
-			#if 0
-			// Add EQ to input
-			for (size_t j = 0; j < windows.size(); j++) {
-				auto& start = window_start_index.at(j);
-				
-				for (size_t k = 0; k < windows.at(j).size(); k++) {
-					if (start + k >= fft_iterative.second.size())
-						break;
-						
-					fft_iterative.second.at(start + k) -= windows.at(j).at(k);
-					final_eqs.at(start + k) += windows.at(j).at(k);
-				}
-			}
-			#endif
 			
 			fitBands(fft_iterative, eq_settings);
 		}
 		
-		#if 0
-		cout << "Final EQs: ";
-		for (auto& value : final_eqs)
-			cout << value << " ";
-		cout << endl;
-		#endif
-		
 		fft_iterative.second = final_eqs;
-		
 		fitBands(fft_iterative, eq_settings);
 		
-		#if 0
-		auto hamming_window = sp::hamming(256);
-		vector<double> values;
-		
-		for (auto& value : hamming_window)
-			values.push_back(value);
-			
-		auto dbs = toDecibel({ vector<double>(), values });
-		
-		for (auto& db : dbs.second)
-			cout << "DB " << db << endl;
-		#endif
-		
 		return fitBands(input, eq_settings);
+		#endif
+		#endif
 	}
 	
 	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
@@ -434,8 +576,8 @@ namespace nac {
 			band_limits.push_back(lower);
 			band_limits.push_back(upper);
 			
-			cout << "Added band limit " << lower << endl;
-			cout << "Added band limit " << upper << endl;
+			//cout << "Added band limit " << lower << endl;
+			//cout << "Added band limit " << upper << endl;
 		}
 		
 		vector<double> energy(eq_frequencies.size(), 0);

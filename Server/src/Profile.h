@@ -34,8 +34,8 @@ private:
 	double low_cutoff_	= 0;
 	double high_cutoff_	= 0;
 	
-	double steep_low_	= -96;
-	double steep_high_	= -256;
+	double steep_low_	= -12;
+	double steep_high_	= -12;
 	
 	double dsp_max_eq_	= 0;
 	double dsp_min_eq_	= 0;

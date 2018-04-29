@@ -1057,7 +1057,7 @@ static T mean(const vector<T>& container) {
 }
 
 void Handle::testing() {
-	//try {
+	try {
 		string filename = "before.wav";
 		vector<short> data;
 		WavReader::read(filename, data);
@@ -1068,26 +1068,8 @@ void Handle::testing() {
 		auto difference = nac::getDecibelDifference(nac::doFFT(data), g_target_mean);
 		auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
 		auto final_eq = nac::getEQ(applied, speaker_profile.getSpeakerEQ());
-		
-		#if 0
-		for (int j = 0; j < 10; j++) {
-			double mean_db = mean(final_eq);
-			
-			for (size_t i = 0; i < final_eq.size(); i++) {
-				final_eq.at(i) -= mean_db;
-				cout << "Frequency\t" << speaker_profile.getSpeakerEQ().first.at(i) << "\t:\t" << final_eq.at(i) << endl;
-			}
-			
-			for (auto& setting : final_eq) {
-				if (setting < speaker_profile.getMinEQ())
-					setting = speaker_profile.getMinEQ();
-				else if (setting > speaker_profile.getMaxEQ())
-					setting = speaker_profile.getMaxEQ();
-			}
-		}
-		#endif
-	//} catch (...) {
+	} catch (...) {
 		// Testing method failed, we don't care
-		//return;
-	//}
+		return;
+	}
 }
