@@ -89,15 +89,6 @@ static double correctMaxEQ(vector<double>& eq) {
 		
 		for (auto& setting : eq)
 			setting -= mean_db;
-		
-		#if 0
-		if (i == 1) {
-			eq.front() *= 3;
-			eq.back() *= 3;
-			
-			continue;
-		}
-		#endif
 				
 		for (auto& setting : eq) {
 			if (setting < min_eq)
@@ -110,6 +101,13 @@ static double correctMaxEQ(vector<double>& eq) {
 	}
 	
 	return total_mean_change;
+}
+
+void Speaker::addCustomerEQ(const vector<double>& eq) {
+	for (size_t i = 0; i < eq.size(); i++)
+		current_best_eq_.at(i) += eq.at(i);
+		
+	best_speaker_volume_ += correctMaxEQ(current_best_eq_);
 }
 
 static void printEQ(const string& ip, const vector<double>& eq, const string& name) {

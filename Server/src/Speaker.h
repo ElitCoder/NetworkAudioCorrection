@@ -40,6 +40,7 @@ public:
 	void setNextEQ(const std::vector<double>& eq, double score);
 	void setNextVolume();
 	void setBestVolume();
+	void addCustomerEQ(const std::vector<double>& eq);
 	
 	// Mic setters
 	void setFrequencyResponseFrom(const std::string& ip, const std::vector<double>& dbs);

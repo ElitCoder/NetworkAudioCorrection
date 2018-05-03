@@ -21,3 +21,6 @@ fast: 1
 use_2d: 1
 # timeout in seconds
 timeout: 10
+
+# Sound settings
+enable_customer_profile: 1
