@@ -23,4 +23,4 @@ use_2d: 1
 timeout: 10
 
 # Sound settings
-enable_customer_profile: 0
+enable_customer_profile: 1

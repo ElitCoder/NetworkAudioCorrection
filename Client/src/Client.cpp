@@ -362,7 +362,7 @@ void run(const string& host, unsigned short port) {
 }
 
 int main() {
-	const string HOST = "lnxniklasc";
+	const string HOST = "localhost";
 	const unsigned short PORT = 10200;
 	
 	run(HOST, PORT);

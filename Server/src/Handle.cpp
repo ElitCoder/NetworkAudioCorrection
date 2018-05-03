@@ -60,7 +60,7 @@ static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 //static vector<double> g_normalization_profile = { 6, 3, 1, -1, -1.5, 0, 0, 0, 3 };
 
 // After calibration customer profile
-static vector<double> g_customer_profile = { 6, 3, 1, -1, 0, 0, -2, 0, 3 };
+static vector<double> g_customer_profile = { 5, 3, 2, -2, -1, -3, -2, 1, 1 };
 
 static double g_target_mean = -45;
 //vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
@@ -132,7 +132,7 @@ void resetEverything(const vector<string>& ips) {
 }
 
 static void setTestSpeakerSettings(const vector<string>& ips) {
-	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
+	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; "; //dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
 	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
