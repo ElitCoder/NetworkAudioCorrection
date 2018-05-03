@@ -12,10 +12,10 @@ class Profile;
 // NetworkAudioCorrection
 namespace nac {
 	FFTOutput doFFT(const std::vector<short>& samples);
-	FFTOutput getDecibelDifference(const FFTOutput& input, double target_db);
+	FFTOutput getDifference(const FFTOutput& input, double target, bool use_mean);
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile);
 	FFTOutput toDecibel(const FFTOutput& input);
-	std::vector<double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
+	std::vector<double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings, bool input_db);
 	std::vector<double> getEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
 }
 

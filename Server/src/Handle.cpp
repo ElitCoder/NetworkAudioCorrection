@@ -129,7 +129,7 @@ void resetEverything(const vector<string>& ips) {
 }
 
 static void setTestSpeakerSettings(const vector<string>& ips) {
-	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
+	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; "; //dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
 	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
@@ -432,7 +432,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = pow(10, response / 20) * (double)SHRT_MAX;
+				double linear_energy = pow(10, response / 10);
 				
 				total_linear_energy.at(k).at(i) += linear_energy;
 			}
@@ -447,7 +447,7 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = pow(10, response / 20) * (double)SHRT_MAX;
+				double linear_energy = pow(10, response / 10);
 				
 				double weight = linear_energy / total_linear_energy.at(k).at(i);
 				
@@ -465,11 +465,11 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 	return final_eqs;
 }
 
-static void runFrequencyResponseScripts(const vector<string>& speakers, const vector<string>& mics, const string& filename) {
+static void runFrequencyResponseScripts(const vector<string>& speakers, const vector<string>& mics, const string& filename, int play) {
 	vector<string> scripts;
 	
 	auto idle = Base::config().get<int>("idle_time");
-	auto play = Base::config().get<int>("play_time");
+	//auto play = Base::config().get<int>("play_time");
 	
 	for (size_t i = 0; i < speakers.size(); i++) {
 		string script = "sleep " + to_string(idle + i * (play + idle)) + "; wait; ";
@@ -513,7 +513,7 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 		setSpeakersEQ(speaker_ips, TYPE_NEXT_EQ);
 		
 		// Run frequency responses
-		runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
+		runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"), Base::config().get<int>("play_time_freq"));
 		
 		// Collect data
 		Base::system().getRecordings(mic_ips);
@@ -539,7 +539,7 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 				vector<double> dbs;
 				
 				for (auto& db_linear : db_linears) {
-					double db = 20 * log10(db_linear / (double)SHRT_MAX);
+					double db = 10 * log10(db_linear);
 					
 					dbs.push_back(db);
 				}
@@ -700,7 +700,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static void showCalibrationScore(const vector<string>& mic_ips) {
+static void showCalibrationScore(const vector<string>& mic_ips, bool apply_profile) {
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -717,10 +717,13 @@ static void showCalibrationScore(const vector<string>& mic_ips) {
 		
 		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
 		
-		auto fft_output = nac::doFFT(sound);
-		//auto band_dbs = nac::getDecibelDifference(fft_output, g_target_mean);
+		auto fft_output = nac::toDecibel(nac::doFFT(sound));
+		auto applied = fft_output;
 		
-		nac::fitBands(nac::toDecibel(fft_output), Base::system().getSpeakerProfile().getSpeakerEQ());
+		if (apply_profile)
+			applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
+		
+		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
 	}
 }
 
@@ -893,7 +896,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	//g_target_mean = flat_level_db;
 	
 	// See calibration score before calibrating
-	showCalibrationScore(mic_ips);
+	showCalibrationScore(mic_ips, false);
 	
 	auto timestamp = writeWhiteNoiseFiles("before");
 
@@ -901,16 +904,21 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
 	
 	// Run frequency responses
-	if (run_white_noise)
-		runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
-	else
-		runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"));
-	
-	// Collect data
-	Base::system().getRecordings(mic_ips);
+	if (run_white_noise) {
+		if (speaker_ips.size() > 1) {
+			runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("white_noise"), Base::config().get<int>("play_time"));
+			Base::system().getRecordings(mic_ips);
+		}
+	} else {
+		runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("sound_image_file_short"), Base::config().get<int>("play_time_freq"));
+		Base::system().getRecordings(mic_ips);
+	}
 	
 	auto idle = Base::config().get<int>("idle_time");
 	auto play = Base::config().get<int>("play_time");
+	
+	if (!run_white_noise)
+		play = Base::config().get<int>("play_time_freq");
 	
 	// Wanted EQs by microphones
 	MicWantedEQ wanted_eqs;
@@ -937,6 +945,18 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				auto eq_settings = Base::system().getSpeakerProfile().getSpeakerEQ();
 				
 				auto response = getWhiteResponse(data, sound_start, sound_stop);
+				response = nac::toDecibel(response);
+				
+				auto fit_response = nac::fitBands(response, eq_settings, true);
+				
+				auto difference = nac::getDifference(response, g_target_mean, false);
+				//auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+				
+				final_eq = nac::fitBands(difference, eq_settings, true);
+				dbs = fit_response;
+				
+				#if 0
+				auto response = getWhiteResponse(data, sound_start, sound_stop);
 				auto difference = nac::getDecibelDifference(response, g_target_mean);
 				auto fit_response = nac::fitBands(nac::toDecibel(response), eq_settings);
 				
@@ -944,16 +964,17 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
 				
 				// Lower frequency resolution to fit speaker EQ
-				final_eq = nac::getEQ(applied, eq_settings);
+				final_eq = nac::getEQ(difference, eq_settings);
 				
 				// Set microphone response for this speaker
 				dbs = fit_response;
+				#endif
 			} else {
 				// Calculate FFT for 9 band as well
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
 				
 				for (auto& db_linear : db_linears) {
-					double db = 20 * log10(db_linear);
+					double db = 10 * log10(db_linear);
 					
 					dbs.push_back(db);
 				}
@@ -1005,7 +1026,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	showCalibrationScore(mic_ips);
+	showCalibrationScore(mic_ips, false);
 	
 	writeWhiteNoiseFiles("after", timestamp);
 	writeEQSettings("after", timestamp, speaker_ips);
@@ -1057,6 +1078,7 @@ static T mean(const vector<T>& container) {
 }
 
 void Handle::testing() {
+	#if 0
 	try {
 		string filename = "before.wav";
 		vector<short> data;
@@ -1072,4 +1094,5 @@ void Handle::testing() {
 		// Testing method failed, we don't care
 		return;
 	}
+	#endif
 }

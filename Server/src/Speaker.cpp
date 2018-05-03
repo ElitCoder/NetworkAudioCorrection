@@ -90,6 +90,15 @@ static double correctMaxEQ(vector<double>& eq) {
 		for (auto& setting : eq)
 			setting -= mean_db;
 		
+		#if 0
+		if (i == 1) {
+			eq.front() *= 3;
+			eq.back() *= 3;
+			
+			continue;
+		}
+		#endif
+				
 		for (auto& setting : eq) {
 			if (setting < min_eq)
 				setting = min_eq;

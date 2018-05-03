@@ -144,7 +144,7 @@ namespace nac {
 		for (auto& sample : samples)
 			in.push_back((double)sample / SHRT_MAX);
 		
-		const int N = 4096;
+		const int N = 8192;
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
@@ -166,15 +166,32 @@ namespace nac {
 			
 			frequencies.push_back(frequency);
 		}
+		
+		double std_dev = calculateSD(output);
+		cout << "std_dev " << std_dev << endl;
 			
 		return { frequencies, output };
 	}
 	
-	FFTOutput getDecibelDifference(const FFTOutput& input, double target_db) {
+	FFTOutput getDifference(const FFTOutput& input, double target, bool use_mean) {
+		auto& frequencies = input.first;
+		auto& magnitudes = input.second;
+		
+		auto mean_target = mean(magnitudes);
+		vector<double> difference;
+		
+		for (auto& db : magnitudes)
+			difference.push_back((use_mean ? mean_target : target) - db);
+			
+		return { frequencies, difference };
+		
+		#if 0
 		auto& frequencies = input.first;
 		auto& magnitudes = input.second;
 		vector<double> gain_db;
 		vector<double> difference_db;
+		
+		double target_linear = mean(magnitudes);
 		
 		for (size_t i = 0; i < frequencies.size(); i++) {
 			auto& energy = magnitudes.at(i);
@@ -196,8 +213,13 @@ namespace nac {
 			
 			//cout << "Frequency difference\t" << frequencies.at(i) << "\t:\t" << difference_db.back() << endl;
 		}
+		
+		db_std_dev = calculateSD(difference_db);
+		
+		cout << "Normalized db_std_dev " << db_std_dev << endl;
 			
 		return { frequencies, difference_db };
+		#endif
 	}
 	
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
@@ -248,7 +270,7 @@ namespace nac {
 		auto& linear = output.second;
 		
 		for (auto& energy : linear)
-			energy = 20 * log10(energy);
+			energy = 10 * log10(energy);
 			
 		return output;	
 	}
@@ -395,7 +417,7 @@ namespace nac {
 	#endif
 	
 	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
-		return fitBands(input, eq_settings);
+		return fitBands(input, eq_settings, false);
 		
 		#if 0
 		vector<double> current_eq(eq_settings.first.size(), 0);
@@ -560,7 +582,7 @@ namespace nac {
 		#endif
 	}
 	
-	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
+	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
 		auto& eq_frequencies = eq_settings.first;
 		//auto& q = eq_settings.second;
 		
@@ -576,9 +598,18 @@ namespace nac {
 			band_limits.push_back(lower);
 			band_limits.push_back(upper);
 			
-			//cout << "Added band limit " << lower << endl;
-			//cout << "Added band limit " << upper << endl;
+			cout << "Added band limit " << lower << endl;
+			cout << "Added band limit " << upper << endl;
 		}
+		
+		#if 0
+		// Set speaker profile limitations
+		if (speaker_profile.getLowCutOff() > band_limits.front())
+			band_limits.front() = speaker_profile.getLowCutOff();
+			
+		if (speaker_profile.getHighCutOff() < band_limits.back())
+			band_limits.back() = speaker_profile.getHighCutOff();
+		#endif
 		
 		vector<double> energy(eq_frequencies.size(), 0);
 		vector<double> num(eq_frequencies.size(), 0);
@@ -594,6 +625,7 @@ namespace nac {
 			if (index < 0)
 				continue;
 			
+			//double linear = pow(10, dbs.at(i) / 20);
 			energy.at(index) += dbs.at(i);
 			num.at(index)++;
 		}
@@ -602,6 +634,10 @@ namespace nac {
 		
 		for (size_t i = 0; i < num.size(); i++) {
 			energy.at(i) /= num.at(i);
+			
+			// Convert to dB
+			if (!input_db)
+				energy.at(i) = 10 * log10(energy.at(i));
 			
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
 		}

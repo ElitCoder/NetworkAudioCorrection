@@ -56,3 +56,12 @@ double Profile::getMinEQ() const {
 int Profile::getNumEQBands() const {
 	return eq_frequencies_.size();
 }
+
+Profile Profile::invert() const {
+	Profile profile = *this;
+	
+	profile.steep_low_ *= (-1);
+	profile.steep_high_ *= (-1);
+	
+	return profile;
+}

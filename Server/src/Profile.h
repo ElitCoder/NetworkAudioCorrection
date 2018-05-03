@@ -26,6 +26,8 @@ public:
 	
 	int getNumEQBands() const;
 	
+	Profile invert() const;
+	
 private:
 	std::vector<double> eq_frequencies_;
 	double eq_q_		= 1;
@@ -34,8 +36,8 @@ private:
 	double low_cutoff_	= 0;
 	double high_cutoff_	= 0;
 	
-	double steep_low_	= -12;
-	double steep_high_	= -12;
+	double steep_low_	= -6;
+	double steep_high_	= -6;
 	
 	double dsp_max_eq_	= 0;
 	double dsp_min_eq_	= 0;

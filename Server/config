@@ -12,6 +12,7 @@ no_scripts: 0
 # Script settings
 play_time: 30
 idle_time: 1
+play_time_freq: 3
 
 # Localization3D (degrees and meters)
 degree_accuracy: 10
