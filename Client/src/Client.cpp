@@ -1,5 +1,6 @@
 #include "NetworkCommunication.h"
 #include "Packet.h"
+#include "Config.h"
 
 #include <iostream>
 #include <algorithm>
@@ -26,6 +27,7 @@ enum {
 };
 
 static NetworkCommunication* g_network;
+static Config g_config;
 /*
 	Available:
 	
@@ -362,8 +364,13 @@ void run(const string& host, unsigned short port) {
 }
 
 int main() {
-	const string HOST = "localhost";
-	const unsigned short PORT = 10200;
+	g_config.parse("config");
+	
+	const string HOST = g_config.get<string>("host");
+	const unsigned short PORT = g_config.get<unsigned short>("port");
+	
+	g_ips = g_config.getAll<string>("speakers");
+	g_external_microphones = g_config.getAll<string>("microphones");
 	
 	run(HOST, PORT);
 	
