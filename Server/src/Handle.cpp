@@ -54,16 +54,14 @@ static vector<string> g_frequencies =	{	"63",
 											"16000"	};
 
 // Customer's profile, just keep it flat for now
-// Flat EQ
-static vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+// Flat EQ, calibrate towards flat and add different EQs on top of that
+vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 // Axis own music EQ with adjustments
-//static vector<double> g_normalization_profile = { 6, 3, 1, -1, -1.5, 0, 0, 0, 3 };
-
 // After calibration customer profile
-static vector<double> g_customer_profile = { 5, 3, 2, -2, -1, -3, -2, 1, 1 };
+vector<double> g_customer_profile = { 5, 3, 2, -2, -1, -3, -2, 1, 1 };
 
-static double g_target_mean = -45;
-//vector<double> g_speaker_dsp_factor = { 0.861209, 0.954355, 0.973813, 0.975453, 0.962486, 0.953907, 0.96555, 0.942754, /* 1.01998 */ 1 }; // Which factor the EQ's should be multiplied with to get the right result
+double g_target_db_level = 0;
 
 // The following function is from SO
 constexpr char hexmap[] = {	'0', '1', '2', '3', '4', '5', '6', '7',
@@ -282,7 +280,7 @@ static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noi
 	
 	for (size_t i = 0; i < dbs.size(); i++) {
 		// Get score against chosen profile
-		double profile_db = g_target_mean + g_normalization_profile.at(i);
+		double profile_db = g_target_db_level + g_normalization_profile.at(i);
 		double db = dbs.at(i);
 		double difference = profile_db - db;
 
@@ -703,7 +701,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static void showCalibrationScore(const vector<string>& mic_ips, bool apply_profile) {
+static void showCalibrationScore(const vector<string>& mic_ips) {
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -723,7 +721,7 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool apply_profi
 		auto fft_output = nac::toDecibel(nac::doFFT(sound));
 		auto applied = fft_output;
 		
-		if (apply_profile)
+		if (Base::config().get<bool>("enable_hardware_profile"))
 			applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
 		
 		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
@@ -906,7 +904,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	//g_target_mean = flat_level_db;
 	
 	// See calibration score before calibrating
-	showCalibrationScore(mic_ips, false);
+	showCalibrationScore(mic_ips);
 	
 	auto timestamp = writeWhiteNoiseFiles("before");
 
@@ -959,10 +957,13 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				
 				auto fit_response = nac::fitBands(response, eq_settings, true);
 				
-				auto difference = nac::getDifference(response, g_target_mean, false);
-				//auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+				auto difference = nac::getDifference(response, g_target_db_level, false);
+				auto applied = difference;
 				
-				final_eq = nac::fitBands(difference, eq_settings, true);
+				if (Base::config().get<bool>("enable_hardware_profile"))
+					applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+				
+				final_eq = nac::fitBands(applied, eq_settings, true);
 				dbs = fit_response;
 				
 				#if 0
@@ -1036,7 +1037,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	Base::system().getRecordings(mic_ips);
 	
 	// See calibration score before calibrating
-	showCalibrationScore(mic_ips, false);
+	showCalibrationScore(mic_ips);
 	
 	writeWhiteNoiseFiles("after", timestamp);
 	writeEQSettings("after", timestamp, speaker_ips);

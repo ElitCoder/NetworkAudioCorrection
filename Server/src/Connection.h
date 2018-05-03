@@ -2,9 +2,6 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
 
-//#include "Packet.h"
-//#include "PartialPacket.h"
-
 #include <list>
 #include <cstddef>
 

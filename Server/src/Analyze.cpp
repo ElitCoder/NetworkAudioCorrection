@@ -10,54 +10,6 @@
 
 using namespace std;
 
-#if 0
-static const vector<int> band_limits = {	44,		88,
-											88,		177,
-											177,	355,
-											355,	710,
-											710,	1420,
-											1420,	2840,
-											2840,	5680,
-											5680,	11360,
-											11360,	22720	};
-#endif
-
-// Not used right now
-#if 0								
-static const vector<double> eq_limits = {	38.936,		101.936,
-											77.254,		202.254,
-											154.508,	404.508,
-											309.017,	809.017,
-											618.034,	1618.034,
-											1236.068,	3236.068,
-											2472.136,	6472.136,
-											4944.272,	12944.272,
-											9888.544,	25888.544	};										
-#endif
-
-#if 0
-static vector<string> g_frequencies =	{	"63",
-											"125",
-											"250",
-											"500",
-											"1000",
-											"2000",
-											"4000",
-											"8000",
-											"16000"	};
-
-// Specific profiles depending on hardware
-// If we're recording outside of these ranges, changes won't matter since the microphone doesn't pick it up anyway
-// If we're boosting outside of these ranges, changes won't matter since the speaker won't play these frequencies
-// So, ignore them in the calibration since it won't be effective in real life anyway
-const bool	ENABLE_DEVICE_PROFILES_INPUT	= false;
-const bool	ENABLE_DEVICE_PROFILES_OUTPUT	= false;
-const int	SPEAKER_MIN_HZ					= 60;
-const int	SPEAKER_MAX_HZ					= 20000;
-const int	MIC_MIN_HZ						= 20;
-const int	MIC_MAX_HZ						= 20000;
-#endif
-
 template<class T>
 static T mean(const vector<T>& container) {
 	double sum = 0;
@@ -111,32 +63,6 @@ static int getClosestIndex(double frequency, const vector<double>& container) {
 }
 #endif
 
-#if 0
-static double correctMaxEQ(vector<double>& eq) {
-	double total_mean_change = 0;
-	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
-	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
-	
-	for (int i = 0; i < 1000; i++) {
-		double mean_db = mean(eq);
-		
-		for (auto& setting : eq)
-			setting -= mean_db;
-		
-		for (auto& setting : eq) {
-			if (setting < min_eq)
-				setting = min_eq;
-			else if (setting > max_eq)
-				setting = max_eq;
-		}
-		
-		total_mean_change += mean_db;
-	}
-	
-	return total_mean_change;
-}
-#endif
-
 namespace nac {
 	FFTOutput doFFT(const vector<short>& samples) {
 		vector<double> in;
@@ -184,42 +110,6 @@ namespace nac {
 			difference.push_back((use_mean ? mean_target : target) - db);
 			
 		return { frequencies, difference };
-		
-		#if 0
-		auto& frequencies = input.first;
-		auto& magnitudes = input.second;
-		vector<double> gain_db;
-		vector<double> difference_db;
-		
-		double target_linear = mean(magnitudes);
-		
-		for (size_t i = 0; i < frequencies.size(); i++) {
-			auto& energy = magnitudes.at(i);
-			gain_db.push_back(20 * log10(energy));
-			
-			//cout << "Frequency\t" << frequencies.at(i) << "\t:\t" << gain_db.back() << endl;
-		}
-		
-		//auto db_mean = mean(gain_db);
-		auto db_std_dev = calculateSD(gain_db);
-		
-		//cout << "db_mean " << db_mean << endl;
-		cout << "target_db " << target_db << endl;
-		cout << "db_std_dev " << db_std_dev << endl;
-		
-		for (size_t i = 0; i < gain_db.size(); i++) {
-			auto& db = gain_db.at(i);
-			difference_db.push_back(target_db - db);
-			
-			//cout << "Frequency difference\t" << frequencies.at(i) << "\t:\t" << difference_db.back() << endl;
-		}
-		
-		db_std_dev = calculateSD(difference_db);
-		
-		cout << "Normalized db_std_dev " << db_std_dev << endl;
-			
-		return { frequencies, difference_db };
-		#endif
 	}
 	
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
@@ -234,9 +124,7 @@ namespace nac {
 		//const int N = input.first.size();
 		auto& frequencies = output.first;
 		auto& dbs = output.second;
-		
-		//vector<double> graph(N, 0);
-		
+
 		// Set cutoffs to 0 and everything outside to steep * length
 		for (size_t i = 0; i < frequencies.size(); i++) {
 			auto& frequency = frequencies.at(i);
@@ -247,19 +135,13 @@ namespace nac {
 				double steps = log2(low / frequency);
 				double attenuation = steps * steep_low;
 				
-				db += attenuation;
-				
-				//cout << "Attenuated " << frequency << " " << attenuation << endl;
+				db += attenuation;				
 			} else if (frequency > high) {
 				double steps = log2(frequency / high);
 				double attenuation = steps * steep_high;
 				
 				db += attenuation;
-				
-				//cout << "Attenuated " << frequency << " " << attenuation << endl;
 			}
-			
-			//cout << frequency << " " << db << endl;
 		}
 			
 		return output;
@@ -625,7 +507,6 @@ namespace nac {
 			if (index < 0)
 				continue;
 			
-			//double linear = pow(10, dbs.at(i) / 20);
 			energy.at(index) += dbs.at(i);
 			num.at(index)++;
 		}

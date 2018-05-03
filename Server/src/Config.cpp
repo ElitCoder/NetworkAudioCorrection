@@ -2,17 +2,16 @@
 
 #include <vector>
 #include <fstream>
-#include <iostream>
 
 using namespace std;
 
-void Config::add(const pair<string, string>& config) {
+void Config::add(const pair<string, deque<string>>& config) {
 	configs_[config.first] = config.second;
 }
 
-static vector<string> getTokens(string input, char delimiter) {
+static deque<string> getTokens(string input, char delimiter) {
 	istringstream stream(input);
-	vector<string> tokens;
+	deque<string> tokens;
 	string token;
 	
 	while (getline(stream, token, delimiter))
@@ -26,7 +25,7 @@ void Config::parse(const string& filename) {
 	ifstream file(filename);
 	
 	if (!file.is_open()) {
-		cout << "Warning: could not open config\n";
+		cout << "Could not open config " << filename << endl;
 		
 		return;
 	}
@@ -42,9 +41,17 @@ void Config::parse(const string& filename) {
 		// Remove ':' from the setting
 		tokens.front().pop_back();
 		
-		cout << "Set key " << tokens.front() << " to value " << tokens.back() << endl;
+		cout << "Set key " << tokens.front() << " to value(s): ";
 		
-		add({ tokens.front(), tokens.back() });
+		string key = tokens.front();
+		tokens.pop_front();
+		
+		for (auto& token : tokens)
+			cout << token << " ";
+		
+		cout << endl;
+		
+		add({ key, tokens });
 	}
 	
 	file.close();
@@ -52,4 +59,8 @@ void Config::parse(const string& filename) {
 
 void Config::clear() {
 	configs_.clear();
+}
+
+map<string, deque<string>>& Config::internal() {
+	return configs_;
 }

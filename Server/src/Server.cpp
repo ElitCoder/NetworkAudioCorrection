@@ -28,6 +28,8 @@ enum {
 };
 
 extern Connection* g_current_connection;
+extern double g_target_db_level;
+extern vector<double> g_customer_profile;
 
 static void handle(Connection& connection, Packet& input_packet) {
 	g_current_connection = &connection;
@@ -209,30 +211,42 @@ static void start() {
 }
 
 int main() {
+	Base::config().parse("config");
+	
+	auto low_cutoff = Base::config().get<double>("hardware_profile_cutoff_low");
+	auto high_cutoff = Base::config().get<double>("hardware_profile_cutoff_high");
+	
 	// Set profiles here for now
 	Profile speaker;
-	speaker.setCutoffs(60, 20000);
+	speaker.setCutoffs(low_cutoff, high_cutoff);
 	
 	Profile microphone;
-	microphone.setCutoffs(20, 20000);
+	microphone.setCutoffs(low_cutoff, high_cutoff);
 	
-	vector<double> frequencies = { 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
-	double q = 1;
+	auto steep_low = Base::config().get<double>("hardware_profile_steep_low");
+	auto steep_high = Base::config().get<double>("hardware_profile_steep_high");
+	
+	speaker.setSteep(steep_low, steep_high);
+	microphone.setSteep(steep_low, steep_high);
+	
+	vector<double> frequencies = Base::config().getAll<double>("dsp_eq"); //{ 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
+	double q = Base::config().get<double>("dsp_eq_q");
 	
 	speaker.setSpeakerEQ(frequencies, q);
-	speaker.setMaxEQ(12);
-	speaker.setMinEQ(-12);
+	speaker.setMaxEQ(Base::config().get<double>("dsp_eq_max"));
+	speaker.setMinEQ(Base::config().get<double>("dsp_eq_min"));
 	
 	Base::system().setSpeakerProfile(speaker);
 	Base::system().setMicrophoneProfile(microphone);
+	
+	g_target_db_level = Base::config().get<double>("target_db_level");
+	g_customer_profile = Base::config().getAll<double>("customer_profile");
 	
 	// For testing
 	//Handle::testing();
 	
 	// Initialize curlpp
 	curlpp::initialize();
-	
-	Base::config().parse("config");
 	
 	cout << "Starting server at port " << Base::config().get<unsigned short>("port") << endl;
 	start();
