@@ -2,6 +2,10 @@
 #include "Speaker.h"
 #include "Profile.h"
 
+// TODO: Remove this dependency
+#include "Base.h"
+#include "System.h"
+
 // SigPack
 #include <sigpack/sigpack.h>
 
@@ -485,6 +489,8 @@ namespace nac {
 		}
 		
 		#if 0
+		auto& speaker_profile = Base::system().getSpeakerProfile();
+		
 		// Set speaker profile limitations
 		if (speaker_profile.getLowCutOff() > band_limits.front())
 			band_limits.front() = speaker_profile.getLowCutOff();

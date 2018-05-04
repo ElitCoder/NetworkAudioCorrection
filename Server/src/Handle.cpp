@@ -721,8 +721,8 @@ static void showCalibrationScore(const vector<string>& mic_ips) {
 		auto fft_output = nac::toDecibel(nac::doFFT(sound));
 		auto applied = fft_output;
 		
-		if (Base::config().get<bool>("enable_hardware_profile"))
-			applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
+		//if (Base::config().get<bool>("enable_hardware_profile"))
+		//	applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
 		
 		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
 	}
@@ -960,26 +960,20 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				auto difference = nac::getDifference(response, g_target_db_level, false);
 				auto applied = difference;
 				
-				if (Base::config().get<bool>("enable_hardware_profile"))
-					applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
+				if (Base::config().get<bool>("enable_hardware_profile")) {
+					auto speaker_profile = Base::system().getSpeakerProfile();
+					auto mic_profile = Base::system().getMicrophoneProfile();
+					
+					if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
+						speaker_profile = speaker_profile.invert();
+						mic_profile = mic_profile.invert();
+					}
+					
+					applied = nac::applyProfiles(difference, speaker_profile, mic_profile);
+				}
 				
 				final_eq = nac::fitBands(applied, eq_settings, true);
 				dbs = fit_response;
-				
-				#if 0
-				auto response = getWhiteResponse(data, sound_start, sound_stop);
-				auto difference = nac::getDecibelDifference(response, g_target_mean);
-				auto fit_response = nac::fitBands(nac::toDecibel(response), eq_settings);
-				
-				// Apply profiles
-				auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
-				
-				// Lower frequency resolution to fit speaker EQ
-				final_eq = nac::getEQ(difference, eq_settings);
-				
-				// Set microphone response for this speaker
-				dbs = fit_response;
-				#endif
 			} else {
 				// Calculate FFT for 9 band as well
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
