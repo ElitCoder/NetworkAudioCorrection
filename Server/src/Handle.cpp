@@ -398,14 +398,14 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 		double dsp_gain;
 		
 		switch (type) {
-			case TYPE_FLAT_EQ: dsp_gain = -12;
+			case TYPE_FLAT_EQ: dsp_gain = Base::config().get<double>("calibration_safe_gain");
 				break;
 				
 			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
 				break;
 				
 			// We don't know which limits the speaker will set during calibration, so safe it and say it will max the EQ (at -12)
-			case TYPE_WHITE_EQ: dsp_gain = -12 + (SPEAKER_MAX_VOLUME - loudest_volume);
+			case TYPE_WHITE_EQ: dsp_gain = Base::config().get<double>("calibration_safe_gain") + (SPEAKER_MAX_VOLUME - loudest_volume);
 				break;
 				
 			case TYPE_BEST_EQ: dsp_gain = SPEAKER_MAX_VOLUME - loudest_gain;
