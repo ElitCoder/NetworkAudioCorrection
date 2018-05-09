@@ -9,11 +9,6 @@
 
 using namespace std;
 
-static const int FREQ_N = 16;
-static const int FREQ_FREQ = 4000;
-static const double FREQ_REDUCING = 0.001;
-static const double FREQ_THRESHOLD = 0.01;
-
 // Taken from git/SO
 double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data)
 {
@@ -84,7 +79,7 @@ static void analyzeSound(const vector<string>& filenames, const vector<string>& 
 		if (recording.getData().empty())
 			return;
 				
-		recording.findStartingTones(filenames.size(), FREQ_N, FREQ_THRESHOLD, FREQ_REDUCING, FREQ_FREQ, (Base::config().get<int>("play_time") + 1) * 48000, Base::config().get<int>("idle_time"));
+		recording.findStartingTones(filenames.size(), Base::config().get<int>("play_time_localization"), Base::config().get<int>("idle_time"));
 	}
 }
 

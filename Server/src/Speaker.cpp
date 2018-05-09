@@ -41,7 +41,7 @@ int Speaker::getPlacementID() const {
 	return last_placement_id_;
 }
 
-Speaker::SpeakerPlacement Speaker::getPlacement() {
+const Speaker::SpeakerPlacement& Speaker::getPlacement() const {
 	return placement_;
 }
 
@@ -260,11 +260,14 @@ void Speaker::SpeakerPlacement::addDistance(const string& ip, double distance) {
 		(*iterator) = { ip, distance };
 }
 
-const array<double, 3>& Speaker::SpeakerPlacement::getCoordinates() {
+const array<double, 3>& Speaker::SpeakerPlacement::getCoordinates() const {
 	return coordinates_;
 }
 
-const vector<pair<string, double>>& Speaker::SpeakerPlacement::getDistances() {
+const vector<pair<string, double>>& Speaker::SpeakerPlacement::getDistances() const {
+	if (distances_.empty())
+		cout << "Warning: distances_ empty\n";
+		
 	return distances_;
 }
 

@@ -1,31 +1,27 @@
 # Connection settings
 port: 10200
 
-
 # Files
-goertzel: testTone.wav
+goertzel: 4000_1s.wav
 sound_image_file_short: 9_freq_3s.wav
 white_noise: white_noise_30s.wav
 
-
 # Testing
 no_scripts: 0
-
 
 # Script settings
 play_time: 30
 idle_time: 1
 play_time_freq: 3
-
+play_time_localization: 1
 
 # Localization3D (degrees and meters)
-degree_accuracy: 10
-point_accuracy: 1
+degree_accuracy: 30
+point_accuracy: 2
 fast: 1
 use_2d: 1
 # timeout in seconds
 timeout: 10
-
 
 # Sound settings
 dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000

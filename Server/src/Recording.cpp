@@ -50,54 +50,86 @@ short getRMS(const vector<short>& data, size_t start, size_t end) {
 	return sqrt(sum);
 }
 
-void Recording::findStartingTones(int num_recordings, const int N, double threshold, double reducing, int frequency, int total_play_time_frames, int idle_time) {
-	double dft;
-	double orig_threshold = threshold;
-	size_t current_i = idle_time * 48000 - 0.5 * (double)48000; // Should start at g_playingLength - 0.5 sec
-	size_t frame_ending = ((double)idle_time - 0.5) * 48000 + total_play_time_frames;
+void Recording::findStartingTones(int num_recordings, int play_time, int idle_time) {
+	int frequency = 4000;
 	
-	cout << "Checking first tone at " << current_i / (double)48000 << " to " << frame_ending / (double)48000 << "\n";
+	// T = 1 / frequency
+	// N = 2 * T * Fs
+	int N = lround(2.0 * 1.0 / (double)frequency * 48000.0);
 	
-	// Check noise level
-	short noise = getRMS(data_, 0, (1.5 * 48000));
-	double noise_dft = goertzel(1.5 * 48000, frequency, 48000, data_.data()) / static_cast<double>(SHRT_MAX);
+	cout << "Setting N to " << N << endl;
 	
-	cout << "Noise level: " << noise << endl;
-	cout << "Noise goertzel: " << noise_dft << endl;
+	// Calculate start and stop times
+	vector<pair<size_t, size_t>> times;
+	vector<size_t> results(num_recordings, 0);
 	
 	for (int i = 0; i < num_recordings; i++) {
-		threshold = orig_threshold;
+		double start_sec = idle_time + i * (idle_time + play_time) - 0.5;
+		double stop_sec = start_sec + play_time;
 		
-		while (threshold > 0) {
-			size_t delta_current = current_i;
-			bool found = false;
-			
-			for (; delta_current < frame_ending; delta_current++) {
-				dft = goertzel(N, frequency, 48000, data_.data() + delta_current) / static_cast<double>(SHRT_MAX);
-				
-				if (dft > threshold) {
-					starting_tones_.push_back(delta_current);
-					//current_i = (total_play_time_frames * (i + 2)) + 0.5 * (double)48000;
-					//frame_ending = 48000 + (total_play_time_frames * (i + 2)) + 1.5 * (double)48000;
-					current_i = ((double)idle_time - 0.5) * 48000 + total_play_time_frames * (i + 1);
-					frame_ending = ((double)idle_time - 0.5) * 48000 + total_play_time_frames * (i + 2);
-					
-					//cout << "delta_current " << delta_current << endl;
-					
-					if (i + 1 != num_recordings)
-						cout << "Found tone, checking " << current_i / (double)48000 << " to " << frame_ending / (double)48000 << " now\n";
-					
-					found = true;
-					break;
-				}
-			}
-			
-			if (found)
-				break;
-				
-			threshold -= reducing;	
-		}
+		times.push_back({ start_sec * 48000.0, stop_sec * 48000.0 });
 	}
+	
+	// Check noise level
+	auto noise = getRMS(data_, data_.size() - idle_time * 48000, data_.size());
+	auto noise_dft = goertzel(idle_time * 48000, frequency, 48000, data_.data() + data_.size() - idle_time * 48000) / (double)SHRT_MAX;
+	
+	cout << id_ << " noise level: " << noise << endl;
+	cout << id_ << " noise dft for " << frequency << " Hz: " << noise_dft << endl;
+	
+	double noise_peak = INT_MIN;
+	
+	// Find peak noise
+	for (size_t i = data_.size() - idle_time * 48000; i < data_.size() - N; i++) {
+		double dft = goertzel(N, frequency, 48000, data_.data() + i) / (double)SHRT_MAX;
+		
+		if (dft > noise_peak)
+			noise_peak = dft;
+	}
+	
+	cout << id_ << " noise peak: " << noise_peak << endl;
+	
+	// Find starting timestamps
+	#pragma omp parallel for
+	for (size_t i = 0; i < times.size(); i++) {
+		auto start = times.at(i).first;
+		auto stop = times.at(i).second;
+		
+		double sound_level_start = (double)start + 0.8 * 48000.0;
+		double sound_level_stop = sound_level_start + (play_time / 2.0) * 48000.0;
+		
+		auto sound_level = goertzel(lround(sound_level_stop - sound_level_start), frequency, 48000, data_.data() + lround(sound_level_start)) / (double)SHRT_MAX;
+		double threshold = sound_level * 0.1;
+		
+		if (noise_peak > threshold) {
+			cout << "Warning: noise_peak > threshold, readjusting threshold\n";
+			
+			threshold = noise_peak * 2;
+		}
+		
+		cout << id_ << " setting threshold " << threshold << " for " << i << endl;
+		
+		bool found = false;
+		
+		for (size_t j = start; j < stop; j++) {
+			auto dft = goertzel(N, frequency, 48000, data_.data() + j) / (double)SHRT_MAX;
+			
+			if (dft < threshold)
+				continue;
+				
+			results.at(i) = j;
+			found = true;
+			
+			cout << id_ << " found tone " << i << " at " << (double)j / 48000.0 << endl;
+			
+			break;
+		}
+		
+		if (!found)
+			cout << "WARNING: " << id_ << " did not find tone for " << i << endl;
+	}
+	
+	starting_tones_ = results;
 }
 
 size_t Recording::getTonePlayingWhen(int id) const {

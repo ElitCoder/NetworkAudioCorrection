@@ -149,7 +149,7 @@ static vector<string> createRunLocalizationScripts(const vector<string>& ips, in
 	
 	for (size_t i = 0; i < ips.size(); i++) {
 		string script =	"arecord -D audiosource -r 48000 -f S16_LE -c 1 -d ";
-		script +=		to_string(idle_time + ips.size() * (idle_time + play_time));
+		script +=		to_string(idle_time + ips.size() * (idle_time + play_time) + idle_time);
 		script +=		" /tmp/cap";
 		script +=		ips.at(i);
 		script +=		".wav &\n";
@@ -171,12 +171,19 @@ static vector<string> createRunLocalizationScripts(const vector<string>& ips, in
 static PlacementOutput assemblePlacementOutput(const vector<Speaker*> speakers) {
 	PlacementOutput output;
 	
+	cout << "Placement:\n";
+	
 	for (auto* speaker : speakers) {
 		auto ip = speaker->getIP();
 		const auto& coordinates = speaker->getPlacement().getCoordinates();
 		const auto& distances = speaker->getPlacement().getDistances();
 		
+		//array<double, 3> coordinates = {{ 0 }};
+		//vector<pair<string, double>> distances = { { ip, 0 } };
+		
 		output.push_back(make_tuple(ip, coordinates, distances));
+		
+		cout << "(" << coordinates.front() << ", " << coordinates.at(1) << ")\n";
 	}
 	
 	return output;
@@ -186,21 +193,24 @@ PlacementOutput Handle::runLocalization(const vector<string>& ips, bool force_up
 	if (ips.empty())
 		return PlacementOutput();
 
+	cout << "Running localization\n";	
+		
 	// Does the server already have relevant positions?
 	vector<int> placement_ids;
+	auto speakers = Base::system().getSpeakers(ips);
 	
-	for (auto& ip : ips)
-		placement_ids.push_back(Base::system().getSpeaker(ip).getPlacementID());
+	for (auto* speaker : speakers)
+		placement_ids.push_back(speaker->getPlacementID());
 	
 	if (adjacent_find(placement_ids.begin(), placement_ids.end(), not_equal_to<int>()) == placement_ids.end() && placement_ids.front() >= 0 && !force_update) {
 		cout << "Server already have relevant position info, returning that\n";
 		
-		return assemblePlacementOutput(Base::system().getSpeakers(ips));
+		return assemblePlacementOutput(speakers);
 	}
 	
 	if (!Base::config().get<bool>("no_scripts")) {
 		// Create scripts
-		int play_time = Base::config().get<int>("play_time");
+		int play_time = Base::config().get<int>("play_time_localization");
 		int idle_time = Base::config().get<int>("idle_time");
 		
 		auto scripts = createRunLocalizationScripts(ips, play_time, idle_time, Base::config().get<string>("goertzel"));
@@ -250,7 +260,7 @@ PlacementOutput Handle::runLocalization(const vector<string>& ips, bool force_up
 		Base::system().getSpeaker(ips.at(i)).setPlacement(speaker_placement, placement_id);
 	}
 	
-	return assemblePlacementOutput(Base::system().getSpeakers(ips));
+	return assemblePlacementOutput(speakers);
 }
 
 vector<bool> Handle::checkSpeakersOnline(const vector<string>& ips) {

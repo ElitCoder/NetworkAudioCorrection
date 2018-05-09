@@ -99,7 +99,7 @@ public:
 	
 private:
 	vector<double> distances_;
-	array<double, 3> coordinates_;
+	array<double, 3> coordinates_ = {{ 0, 0, 0 }};
 	string ip_;
 	bool set_;
 };

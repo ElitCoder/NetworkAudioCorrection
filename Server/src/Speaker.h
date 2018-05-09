@@ -19,15 +19,15 @@ public:
 		void setCoordinates(const std::array<double, 3>& coordinates);
 		void addDistance(const std::string& ip, double distance);
 		
-		const std::array<double, 3>& getCoordinates();
-		const std::vector<std::pair<std::string, double>>& getDistances();
+		const std::array<double, 3>& getCoordinates() const;
+		const std::vector<std::pair<std::string, double>>& getDistances() const;
 		const std::string& getIp();
 		
 	private:
 		std::vector<std::pair<std::string, double>> distances_;
-		std::array<double, 3> coordinates_;
+		std::array<double, 3> coordinates_ = {{ 0, 0, 0 }};
 		
-		std::string ip_;
+		std::string ip_	= "not set";
 	};
 	
 	// Basic speaker setters
@@ -65,7 +65,7 @@ public:
 	std::vector<double> getFrequencyResponseFrom(const std::string& ip) const;
 	
 	// SpeakerPlacement getters
-	SpeakerPlacement getPlacement();
+	const SpeakerPlacement& getPlacement() const;
 	int getPlacementID() const;
 	bool hasPlacement() const;
 	
