@@ -13,25 +13,27 @@
 using namespace std;
 
 static void enableSSH(const string& ip) {
-	curlpp::Cleanup clean;
+	cURLpp::Cleanup clean;
 	string disable_string = "http://";
 	disable_string += ip;
 	disable_string += "/axis-cgi/admin/param.cgi?action=update&Network.SSH.Enabled=yes";
 	
-	curlpp::Easy request;
+	cURLpp::Easy request;
 	ostringstream stream;
 	
-	request.setOpt(curlpp::options::Url(disable_string)); 
-	request.setOpt(curlpp::options::UserPwd(string("root:pass")));
-	request.setOpt(curlpp::options::HttpAuth(CURLAUTH_ANY));
-	request.setOpt(curlpp::options::WriteStream(&stream));
-	request.setOpt(curlpp::options::Timeout(10));
+	request.setOpt(cURLpp::options::Url(disable_string.c_str())); 
+	request.setOpt(cURLpp::options::UserPwd(string("root:pass")));
+	request.setOpt(cURLpp::options::HttpAuth(CURLAUTH_ANY));
+	request.setOpt(cURLpp::options::WriteStream(&stream));
+	request.setOpt(cURLpp::options::Timeout(10));
 	
 	try {
 		request.perform();
-	} catch (...) {
+	} catch (cURLpp::RuntimeError& exception) {
 		// GET request failed
 		cout << "Warning: request timed out in trying to set SSH enable\n";
+		cout << "Request: " << disable_string << endl;
+		cout << "cURLpp error: " << exception.what() << endl;
 		
 		return;
 	}
