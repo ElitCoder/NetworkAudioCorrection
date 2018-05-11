@@ -58,7 +58,7 @@ y_mean = mean(powPy);
 set(0, 'DefaultAxesFontSize', 8);
 
 %Adds a combined plot of both curves for comparing
-both = subplot(2, 1, 1);
+both = subplot(1, 1, 1);
 plot(both, fx, powPx, 'r');
 hold on
 plot(both, fy, powPy, 'g');
@@ -68,6 +68,15 @@ title(both, 'Combined');
 ylabel(both, 'dB');
 xlabel(both, 'Hz');
 grid on
+
+x0=100;
+y0=200;
+width=1920;
+height=300;
+
+set(gcf,'units','points','position',[x0,y0,width,height])
+
+return
 
 eq_file = fopen('eqs', 'r');
 formatSpec = '%f';
