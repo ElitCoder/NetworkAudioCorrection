@@ -29,7 +29,7 @@ dsp_eq_q: 1
 dsp_eq_max: 12
 dsp_eq_min: -12
 enable_customer_profile: 1
-customer_profile: 11 7 2 -2 -1 -3 -2 -1 0
+customer_profile: 6 4 2 -2 -1 -3 -2 -1 3
 enable_hardware_profile: 1
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -6
