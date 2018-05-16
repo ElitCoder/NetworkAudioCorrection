@@ -411,7 +411,7 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 			case TYPE_FLAT_EQ: dsp_gain = Base::config().get<double>("calibration_safe_gain");
 				break;
 				
-			case TYPE_NEXT_EQ: dsp_gain = -15; // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
+			case TYPE_NEXT_EQ: dsp_gain = -15 + (SPEAKER_MAX_VOLUME - loudest_volume); // More headroom for increasing the volume while finding factors (4 steps = 12 dB)
 				break;
 				
 			// We don't know which limits the speaker will set during calibration, so safe it and say it will max the EQ (at -12)
@@ -530,7 +530,7 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 		Base::system().getRecordings(mic_ips);
 		
 		auto idle = Base::config().get<int>("idle_time");
-		auto play = Base::config().get<int>("play_time");
+		auto play = Base::config().get<int>("play_time_freq");
 		
 		// Go through frequency analysis
 		for (size_t k = 0; k < mic_ips.size(); k++) {
@@ -550,7 +550,7 @@ static FactorData findCorrectionFactor(const vector<string>& speaker_ips, const 
 				vector<double> dbs;
 				
 				for (auto& db_linear : db_linears) {
-					double db = 10 * log10(db_linear);
+					double db = 20 * log10(db_linear);
 					
 					dbs.push_back(db);
 				}
@@ -868,7 +868,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Send test files to speakers
 	Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("white_noise"), "/tmp/", true);
 	
-	if (!run_white_noise)
+	if (!run_white_noise || factor_calibration)
 		Base::system().sendFile(speaker_ips, "data/" + Base::config().get<string>("sound_image_file_short"), "/tmp/", true);
 	
 	// Find correction factor
@@ -989,7 +989,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
 				
 				for (auto& db_linear : db_linears) {
-					double db = 10 * log10(db_linear);
+					double db = 20 * log10(db_linear);
 					
 					dbs.push_back(db);
 				}
