@@ -15,5 +15,5 @@ port: 10200
 #microphones: 192.168.0.19 192.168.0.14 192.168.0.10 192.168.0.15
 
 # speakers anechoic 1x1
-speakers: 192.168.0.22
-microphones: 192.168.0.15
+speakers: 192.168.0.11
+microphones: 192.168.0.15 192.168.0.19
