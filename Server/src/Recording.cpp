@@ -72,7 +72,7 @@ void Recording::findStartingTones(int num_recordings, int play_time, int idle_ti
 	
 	// Check noise level
 	auto noise = getRMS(data_, data_.size() - idle_time * 48000, data_.size());
-	auto noise_dft = goertzel(idle_time * 48000, frequency, 48000, data_.data() + data_.size() - idle_time * 48000) / (double)SHRT_MAX;
+	auto noise_dft = goertzel(idle_time * 48000, frequency, 48000, data_.data() + data_.size() - idle_time * 48000);
 	
 	cout << id_ << " noise level: " << noise << endl;
 	cout << id_ << " noise dft for " << frequency << " Hz: " << noise_dft << endl;
@@ -81,7 +81,7 @@ void Recording::findStartingTones(int num_recordings, int play_time, int idle_ti
 	
 	// Find peak noise
 	for (size_t i = data_.size() - idle_time * 48000; i < data_.size() - N; i++) {
-		double dft = goertzel(N, frequency, 48000, data_.data() + i) / (double)SHRT_MAX;
+		double dft = goertzel(N, frequency, 48000, data_.data() + i);
 		
 		if (dft > noise_peak)
 			noise_peak = dft;
@@ -98,7 +98,7 @@ void Recording::findStartingTones(int num_recordings, int play_time, int idle_ti
 		double sound_level_start = (double)start + 0.8 * 48000.0;
 		double sound_level_stop = sound_level_start + (play_time / 2.0) * 48000.0;
 		
-		auto sound_level = goertzel(lround(sound_level_stop - sound_level_start), frequency, 48000, data_.data() + lround(sound_level_start)) / (double)SHRT_MAX;
+		auto sound_level = goertzel(lround(sound_level_stop - sound_level_start), frequency, 48000, data_.data() + lround(sound_level_start));
 		double threshold = sound_level * 0.1;
 		
 		if (noise_peak > threshold) {
@@ -112,7 +112,7 @@ void Recording::findStartingTones(int num_recordings, int play_time, int idle_ti
 		bool found = false;
 		
 		for (size_t j = start; j < stop; j++) {
-			auto dft = goertzel(N, frequency, 48000, data_.data() + j) / (double)SHRT_MAX;
+			auto dft = goertzel(N, frequency, 48000, data_.data() + j);
 			
 			if (dft < threshold)
 				continue;

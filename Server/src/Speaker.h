@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <unordered_map>
+
+enum {
+	DB_TYPE_POWER,
+	DB_TYPE_VOLTAGE
+};
 
 using MicFrequencyResponse = std::vector<std::pair<std::string, std::vector<double>>>;
 
@@ -34,6 +40,7 @@ public:
 	void setIP(const std::string& ip);
 	void setVolume(double volume);
 	void setOnline(bool status);
+	void setdBType(int type);
 	
 	// EQ setters
 	void clearAllEQs();
@@ -44,6 +51,7 @@ public:
 	
 	// Mic setters
 	void setFrequencyResponseFrom(const std::string& ip, const std::vector<double>& dbs);
+	void setSoundLevelFrom(const std::string& ip, double level);
 	
 	// SpeakerPlacement setters
 	void setPlacement(const SpeakerPlacement& placement, int placement_id);
@@ -52,6 +60,7 @@ public:
 	const std::string& getIP() const;
 	double getVolume() const;
 	bool isOnline() const;
+	double getdBType() const;
 	
 	// EQ getters
 	std::vector<double> getNextEQ();
@@ -63,6 +72,7 @@ public:
 	
 	// Mic getters
 	std::vector<double> getFrequencyResponseFrom(const std::string& ip) const;
+	double getSoundLevelFrom(const std::string& ip) const;
 	
 	// SpeakerPlacement getters
 	const SpeakerPlacement& getPlacement() const;
@@ -81,6 +91,7 @@ private:
 	
 	// Information about frequency response from other speakers
 	MicFrequencyResponse mic_frequency_responses_;
+	std::unordered_map<std::string, double> sound_levels_;
 	
 	// Basic members
 	std::string ip_	= "not set";
@@ -90,6 +101,9 @@ private:
 	// Placement members
 	SpeakerPlacement placement_;
 	int last_placement_id_	= -1;
+	
+	// dB type
+	int db_type_ = DB_TYPE_VOLTAGE;
 };
 
 #endif

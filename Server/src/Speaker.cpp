@@ -143,6 +143,8 @@ void Speaker::clearAllEQs() {
 	score_ = 0;
 	best_speaker_volume_ = volume_;
 	mic_frequency_responses_.clear();
+	db_type_ = DB_TYPE_VOLTAGE;
+	sound_levels_.clear();
 }
 
 double Speaker::getBestVolume() const {
@@ -235,6 +237,36 @@ vector<double> Speaker::getFrequencyResponseFrom(const string& ip) const {
 		return vector<double>();
 	else
 		return iterator->second;
+}
+
+double Speaker::getdBType() const {
+	switch (db_type_) {
+		case DB_TYPE_POWER:		return 10;
+		case DB_TYPE_VOLTAGE:	return 20;
+	}
+	
+	cout << "Warning: no dB type specified\n";
+	
+	return 20;
+}
+
+void Speaker::setdBType(int type) {
+	db_type_ = type;
+}
+
+void Speaker::setSoundLevelFrom(const string &ip, double level) {
+	sound_levels_[ip] = level;
+}
+
+double Speaker::getSoundLevelFrom(const string &ip) const {
+	auto search = sound_levels_.find(ip);
+	
+	if (search != sound_levels_.end())
+		return search->second;
+		
+	cout << "Warning: did not find sound level for " << ip << endl;
+	
+	return 0;
 }
 
 /*

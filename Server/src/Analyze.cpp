@@ -72,7 +72,7 @@ namespace nac {
 		vector<double> in;
 		
 		for (auto& sample : samples)
-			in.push_back((double)sample / SHRT_MAX);
+			in.push_back((double)sample / (double)SHRT_MAX);
 		
 		const int N = 8192;
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));

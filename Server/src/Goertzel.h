@@ -11,6 +11,7 @@ namespace Goertzel {
 	Localization3DInput runGoertzel(const std::vector<std::string>& ips);
 }
 
-double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data);
+float goertzel(int numSamples,int TARGET_FREQUENCY,int SAMPLING_RATE, float* data);
+float goertzel(int samples, int frequency, int fs, short* data);
 
 #endif

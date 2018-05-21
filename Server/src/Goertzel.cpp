@@ -4,13 +4,32 @@
 #include "Base.h"
 #include "Config.h"
 
+// SigPack
+//#include <sigpack/sigpack.h>
+
 #include <iostream>
 #include <cmath>
+#include <climits>
 
 using namespace std;
 
-// Taken from git/SO
-double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* data)
+#if 0
+double goertzel(const vector<short>& samples, double frequency, int fs) {
+    // Normalize to [0, 1]
+    vector<double> normalized;
+    normalized.reserve(samples.size());
+    
+    for (auto& sample : samples)
+        normalized.push_back((double)sample / (double)SHRT_MAX);
+        
+    double frequency_index = frequency / (double)fs * samples.size() + 1;
+    
+    auto magnitude = arma::abs(sp::goertzel(arma::vec(normalized), frequency_index));
+}
+#endif
+
+// From SO
+float goertzel(int numSamples,int TARGET_FREQUENCY,int SAMPLING_RATE, float* data)
 {
     int     k,i;
     float   floatnumSamples;
@@ -19,7 +38,7 @@ double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* 
     float   scalingFactor = numSamples / 2.0;
 
     floatnumSamples = (float) numSamples;
-    k = (int) (0.5 + ((floatnumSamples * TARGET_FREQUENCY) / (float)SAMPLING_RATE));
+    k = (int) (0.5 + ((floatnumSamples * TARGET_FREQUENCY) / SAMPLING_RATE));
     omega = (2.0 * M_PI * k) / floatnumSamples;
     sine = sin(omega);
     cosine = cos(omega);
@@ -42,6 +61,17 @@ double goertzel(int numSamples,float TARGET_FREQUENCY,int SAMPLING_RATE, short* 
 
     magnitude = sqrtf(real*real + imag*imag);
     return magnitude;
+}
+
+// Wrapper
+float goertzel(int samples, int frequency, int fs, short* data) {
+    vector<float> normalized;
+    normalized.reserve(samples);
+    
+    for (int i = 0; i < samples; i++)
+        normalized.push_back((double)data[i] / (double)SHRT_MAX);
+        
+    return goertzel(samples, frequency, fs, normalized.data());
 }
 
 static double calculateDistance(Recording& master, Recording& recording) {

@@ -275,12 +275,18 @@ vector<bool> Handle::checkSpeakersOnline(const vector<string>& ips) {
 
 static vector<double> getFFT9(const vector<short>& data, size_t start, size_t end) {
 	vector<short> sound(data.begin() + start, data.begin() + end);
+	vector<float> normalized;
+	normalized.reserve(sound.size());
+	
+	for (auto& sample : sound)
+		normalized.push_back((float)sample / (float)SHRT_MAX);
 	
 	// Let's do 9 Goertzel calculations to get the center frequencies
 	vector<double> dbs;
 	
 	for (auto& frequency_string : g_frequencies)
-		dbs.push_back(goertzel(sound.size(), stoi(frequency_string), 48000, sound.data()));
+		dbs.push_back(goertzel(normalized.size(), stoi(frequency_string), 48000, normalized.data()));
+		//dbs.push_back(goertzel(sound.size(), stoi(frequency_string), 48000, sound.data()));
 		
 	return dbs;
 }
@@ -443,7 +449,8 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = pow(10, response / 10);
+				auto db_type = Base::system().getSpeaker(mic_ips.at(j)).getdBType();
+				double linear_energy = pow(10, response / db_type);
 				
 				total_linear_energy.at(k).at(i) += linear_energy;
 			}
@@ -458,7 +465,8 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 			for (size_t k = 0; k < eqs.at(j).size(); k++) {
 				// Frequency response for this speaker
 				auto response = Base::system().getSpeaker(mic_ips.at(j)).getFrequencyResponseFrom(speaker_ips.at(k)).at(i);
-				double linear_energy = pow(10, response / 10);
+				auto db_type = Base::system().getSpeaker(mic_ips.at(j)).getdBType();
+				double linear_energy = pow(10, response / db_type);
 				
 				double weight = linear_energy / total_linear_energy.at(k).at(i);
 				
@@ -771,8 +779,10 @@ static string writeWhiteNoiseFiles(const string& where, string timestamp = "") {
 	string mkdir = "mkdir " + folder;
 	string move = "cp results/cap* " + folder;
 	
-	system(mkdir.c_str());
-	system(move.c_str());
+	auto answer = system(mkdir.c_str());
+	answer = system(move.c_str());
+	
+	if (answer) {}
 	
 	cout << "mkdir command: " << mkdir << endl;
 	cout << "move command: " << move << endl;
@@ -822,7 +832,7 @@ static string moveFileMATLAB(const string& where, const string& timestamp, const
 	
 	for (auto& command : copy_after) {
 		cout << "Copy command: " << command << endl;
-		system(command.c_str());
+		if (system(command.c_str())) {}
 	}
 		
 	return folder;
@@ -837,7 +847,7 @@ static void moveToMATLAB(const string& timestamp, const vector<string>& mic_ips)
 	string copy_eqs = "cp " + folder_after + "eqs ../matlab/";
 	
 	cout << "Copy EQs: " << copy_eqs << endl;
-	system(copy_eqs.c_str());
+	if (system(copy_eqs.c_str())) {}
 }
 
 static void addCustomerEQ(const vector<string>& speaker_ips) {
@@ -984,6 +994,8 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				
 				final_eq = nac::fitBands(applied, eq_settings, true);
 				dbs = fit_response;
+				
+				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
 			} else {
 				// Calculate FFT for 9 band as well
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
@@ -1011,8 +1023,11 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			
 			new_eqs.push_back(final_eq);
 			
-			// DBs is vector of the current speaker with all its' frequency dBs
+			double sound_level = getRMS(data, sound_start, sound_stop);
+			sound_level = 20 * log10(sound_level / (double)SHRT_MAX);
+			
 			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
+			Base::system().getSpeaker(mic_ip).setSoundLevelFrom(speaker_ips.at(i), sound_level);
 		}
 		
 		// Add this to further calculations when we have all the information
