@@ -41,6 +41,7 @@ public:
 	void setVolume(double volume);
 	void setOnline(bool status);
 	void setdBType(int type);
+	void setDSPGain(double gain);
 	
 	// EQ setters
 	void clearAllEQs();
@@ -69,6 +70,7 @@ public:
 	double getNextVolume() const;
 	double getBestScore() const;
 	double getLoudestBestEQ() const;
+	double getDSPGain() const;
 	
 	// Mic getters
 	std::vector<double> getFrequencyResponseFrom(const std::string& ip) const;
@@ -94,9 +96,10 @@ private:
 	std::unordered_map<std::string, double> sound_levels_;
 	
 	// Basic members
-	std::string ip_	= "not set";
-	double volume_	= 0;
-	bool online_	= false;
+	std::string ip_		= "not set";
+	double volume_		= 0;
+	bool online_		= false;
+	double dsp_gain_	= 0;
 
 	// Placement members
 	SpeakerPlacement placement_;

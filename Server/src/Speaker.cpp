@@ -145,6 +145,7 @@ void Speaker::clearAllEQs() {
 	mic_frequency_responses_.clear();
 	db_type_ = DB_TYPE_VOLTAGE;
 	sound_levels_.clear();
+	dsp_gain_ = 0;
 }
 
 double Speaker::getBestVolume() const {
@@ -267,6 +268,14 @@ double Speaker::getSoundLevelFrom(const string &ip) const {
 	cout << "Warning: did not find sound level for " << ip << endl;
 	
 	return 0;
+}
+
+void Speaker::setDSPGain(double gain) {
+	dsp_gain_ = gain;
+}
+
+double Speaker::getDSPGain() const {
+	return dsp_gain_;
 }
 
 /*

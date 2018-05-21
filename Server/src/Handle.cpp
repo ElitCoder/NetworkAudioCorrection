@@ -53,10 +53,6 @@ static vector<string> g_frequencies =	{	"63",
 											"8000",
 											"16000"	};
 
-// Customer's profile, just keep it flat for now
-// Flat EQ, calibrate towards flat and add different EQs on top of that
-vector<double> g_normalization_profile = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
 // Axis own music EQ with adjustments
 // After calibration customer profile
 vector<double> g_customer_profile = { 5, 3, 2, -2, -1, -3, -2, 1, 1 };
@@ -291,32 +287,11 @@ static vector<double> getFFT9(const vector<short>& data, size_t start, size_t en
 	return dbs;
 }
 
-static vector<double> getSoundImageCorrection(vector<double> dbs, bool white_noise) {
+static vector<double> getSoundImageCorrection(vector<double> dbs) {
 	vector<double> eq;
 	
-	for (size_t i = 0; i < dbs.size(); i++) {
-		// Get score against chosen profile
-		double profile_db = g_target_db_level + g_normalization_profile.at(i);
-		double db = dbs.at(i);
-		double difference = profile_db - db;
-
-		eq.push_back(difference);
-	}
-	
-	if (white_noise) {}
-	
-	#if 0
-	if (white_noise) {
-		// Close bands affect eachother when EQ:ing
-		vector<double> final_eq(eq);
-		
-		for (size_t i = 0; i < eq.size() - 1; i++) {
-			final_eq.at(i) -= (eq.at(i + 1) / 6);
-		}
-		
-		eq = final_eq;
-	}
-	#endif
+	for (size_t i = 0; i < dbs.size(); i++)
+		eq.push_back(g_target_db_level - dbs.at(i));
 	
 	return eq;
 }
@@ -356,6 +331,7 @@ static void setSpeakerVolume(const string& ip, double volume, double base_dsp_le
 	command +=			"; wait\n";
 	
 	Base::system().runScript({ ip }, { command });
+	speaker.setDSPGain(final_level);
 }
 
 static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
@@ -857,6 +833,37 @@ static void addCustomerEQ(const vector<string>& speaker_ips) {
 		speaker->addCustomerEQ(g_customer_profile);
 }
 
+static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vector<string>& mic_ips) {
+	// We know that the calibration ran using calibration_safe_gain
+	double dsp_calibration_level = Base::config().get<double>("calibration_safe_gain");
+	vector<double> gain_difference;
+	
+	// Difference compared to calibration test
+	for (auto* speaker : Base::system().getSpeakers(speaker_ips))
+		gain_difference.push_back(speaker->getDSPGain() - dsp_calibration_level);
+		
+	// Check every microphone
+	for (auto* mic : Base::system().getSpeakers(mic_ips)) {
+		double total = 0;
+		double new_total = 0;
+		
+		for (size_t i = 0; i < speaker_ips.size(); i++) {
+			// Inverse:
+			// db = 20 * log10(linear / c)
+			// db / 20 = log10(linear / c)
+			// 10^(db / 20) = linear / c
+			// c * 10^(db / 20) = linear
+			total += (double)SHRT_MAX * pow(10, mic->getSoundLevelFrom(speaker_ips.at(i)) / 20);
+			new_total += (double)SHRT_MAX * pow(10, (mic->getSoundLevelFrom(speaker_ips.at(i)) + gain_difference.at(i)) / 20);
+		}
+		
+		total = 20 * log10(total / (double)SHRT_MAX);
+		new_total = 20 * log10(new_total / (double)SHRT_MAX);
+		
+		cout << "Microphone " << mic->getIP() << ": total = " << total << " new_total = " << new_total << endl;
+	}
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
 	// Set g_dsp_factor
 	bool run_white_noise = false;
@@ -1012,7 +1019,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 					cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
 				
 				// Calculate correction EQ
-				auto eq = getSoundImageCorrection(dbs, run_white_noise);
+				auto eq = getSoundImageCorrection(dbs);
 				
 				cout << "Which gives the correction EQ of:\n";
 				for (size_t j = 0; j < eq.size(); j++)
@@ -1068,6 +1075,10 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Reset mics & set best EQ
 	resetEverything(mic_ips);
 	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
+	
+	// Check desired gain for every microphone
+	setCalibratedSoundLevel(speaker_ips, mic_ips);
+	
 	enableAudioSystem(all_ips);
 }
 
