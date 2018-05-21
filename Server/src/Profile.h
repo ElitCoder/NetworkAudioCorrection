@@ -28,6 +28,8 @@ public:
 	
 	Profile invert() const;
 	
+	int getFrequencyIndex(int frequency) const;
+	
 private:
 	std::vector<double> eq_frequencies_;
 	double eq_q_		= 1;

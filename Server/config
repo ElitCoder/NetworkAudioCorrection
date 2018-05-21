@@ -39,3 +39,5 @@ hardware_profile_cutoff_high: 17000
 target_db_level: 0
 # Which level the DSP will set when testing white noise
 calibration_safe_gain: -12
+# Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
+safe_dsp_max: 1500

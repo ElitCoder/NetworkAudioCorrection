@@ -65,3 +65,11 @@ Profile Profile::invert() const {
 	
 	return profile;
 }
+
+int Profile::getFrequencyIndex(int frequency) const {
+	for (size_t i = 0; i < eq_frequencies_.size(); i++)
+		if (eq_frequencies_.at(i) >= frequency)
+			return i;
+			
+	return -1;
+}
