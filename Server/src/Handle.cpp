@@ -715,10 +715,14 @@ static void showCalibrationScore(const vector<string>& mic_ips) {
 		auto fft_output = nac::toDecibel(nac::doFFT(sound));
 		auto applied = fft_output;
 		
-		//if (Base::config().get<bool>("enable_hardware_profile"))
-		//	applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
-		
 		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+		
+		if (Base::config().get<bool>("enable_hardware_profile")) {
+			cout << "When enabling hardware profile:\n";
+			
+			applied = nac::applyProfiles(fft_output, Base::system().getSpeakerProfile().invert(), Base::system().getMicrophoneProfile().invert());
+			nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+		}
 	}
 }
 
@@ -838,12 +842,15 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 	double dsp_calibration_level = Base::config().get<double>("calibration_safe_gain");
 	vector<double> gain_difference;
 	
+	auto speakers = Base::system().getSpeakers(speaker_ips);
+	auto microphones = Base::system().getSpeakers(mic_ips);
+	
 	// Difference compared to calibration test
-	for (auto* speaker : Base::system().getSpeakers(speaker_ips))
+	for (auto* speaker : speakers)
 		gain_difference.push_back(speaker->getDSPGain() - dsp_calibration_level);
 		
 	// Check every microphone
-	for (auto* mic : Base::system().getSpeakers(mic_ips)) {
+	for (auto* mic : microphones) {
 		double total = 0;
 		double new_total = 0;
 		
