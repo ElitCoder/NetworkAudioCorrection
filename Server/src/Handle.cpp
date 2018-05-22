@@ -867,6 +867,7 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
 	// Set g_dsp_factor
 	bool run_white_noise = false;
+	bool run_validation = Base::config().get<bool>("validate_white_noise");
 	
 	if (type == WHITE_NOISE)
 		run_white_noise = true;
@@ -918,22 +919,26 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Set test white noise settings
 	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
 	
-	// Play white noise from all speakers to check sound image & collect the recordings
-	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
-	Base::system().getRecordings(mic_ips);
+	string timestamp;
 	
-	// Get sound level from white noise
-	auto flat_level_db = getSoundLevel(mic_ips);
-	
-	cout << "White noise sound level: " << flat_level_db << endl;
-	cout << "Setting target mean to " << flat_level_db << endl;
-	
-	//g_target_mean = flat_level_db;
-	
-	// See calibration score before calibrating
-	showCalibrationScore(mic_ips);
-	
-	auto timestamp = writeWhiteNoiseFiles("before");
+	if (run_validation) {
+		// Play white noise from all speakers to check sound image & collect the recordings
+		runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
+		Base::system().getRecordings(mic_ips);
+		
+		// Get sound level from white noise
+		auto flat_level_db = getSoundLevel(mic_ips);
+		
+		cout << "White noise sound level: " << flat_level_db << endl;
+		//cout << "Setting target mean to " << flat_level_db << endl;
+		
+		//g_target_mean = flat_level_db;
+		
+		// See calibration score before calibrating
+		showCalibrationScore(mic_ips);
+		
+		timestamp = writeWhiteNoiseFiles("before");
+	}
 
 	// Set test DSP gain
 	setSpeakersEQ(speaker_ips, TYPE_FLAT_EQ);
@@ -1055,19 +1060,21 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		Base::system().getSpeaker(speaker_ips.at(j)).setNextEQ(vector<double>(num_bands, 0), INT_MAX);
 	}
 	
-	// Set test white noise settings
-	setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
-	
-	// Play white noise from all speakers to check sound image & collect the recordings
-	runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
-	Base::system().getRecordings(mic_ips);
-	
-	// See calibration score before calibrating
-	showCalibrationScore(mic_ips);
-	
-	writeWhiteNoiseFiles("after", timestamp);
-	writeEQSettings("after", timestamp, speaker_ips);
-	moveToMATLAB(timestamp, mic_ips);
+	if (run_validation) {
+		// Set test white noise settings
+		setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
+		
+		// Play white noise from all speakers to check sound image & collect the recordings
+		runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
+		Base::system().getRecordings(mic_ips);
+		
+		// See calibration score before calibrating
+		showCalibrationScore(mic_ips);
+		
+		writeWhiteNoiseFiles("after", timestamp);
+		writeEQSettings("after", timestamp, speaker_ips);
+		moveToMATLAB(timestamp, mic_ips);
+	}
 	
 	if (Base::config().get<bool>("enable_customer_profile"))
 		addCustomerEQ(speaker_ips);
