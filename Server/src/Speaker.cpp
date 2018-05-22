@@ -257,6 +257,8 @@ void Speaker::setdBType(int type) {
 
 void Speaker::setSoundLevelFrom(const string &ip, double level) {
 	sound_levels_[ip] = level;
+	
+	cout << "Sound level (" << getIP() << " -> " << ip << "): " << level << " dB\n";
 }
 
 double Speaker::getSoundLevelFrom(const string &ip) const {

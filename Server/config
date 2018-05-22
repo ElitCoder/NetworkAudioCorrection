@@ -14,7 +14,7 @@ play_time: 30
 idle_time: 1
 play_time_freq: 3
 play_time_localization: 1
-validate_white_noise: 0
+validate_white_noise: 1
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -31,7 +31,7 @@ dsp_eq_max: 12
 dsp_eq_min: -12
 enable_customer_profile: 0
 customer_profile: 6 4 2 -2 -1 -3 -2 -1 3
-enable_hardware_profile: 1
+enable_hardware_profile: 0
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -6
 hardware_profile_steep_high: -6
@@ -43,4 +43,4 @@ calibration_safe_gain: -12
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
 safe_dsp_max: 1500
 # Actual dBSPL level in mic recording level, e.g -40 dB ~ 80 dbSPL
-actual_db_level: -40
+actual_db_level: -50

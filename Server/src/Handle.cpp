@@ -318,6 +318,7 @@ static void setSpeakerDSPGain(const string& ip, double gain) {
 	Base::system().getSpeaker(ip).setDSPGain(gain);
 }
 
+#if 0
 static void setSpeakerVolume(const string& ip, double volume, double base_dsp_level) {
 	auto& speaker = Base::system().getSpeaker(ip);	
 	speaker.setVolume(volume);
@@ -337,6 +338,7 @@ static void setSpeakerVolume(const string& ip, double volume, double base_dsp_le
 	
 	setSpeakerDSPGain(ip, final_level);
 }
+#endif
 
 static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 	auto speakers = Base::system().getSpeakers(speaker_ips);
@@ -408,7 +410,9 @@ static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
 				break;
 		}
 		
-		setSpeakerVolume(speaker->getIP(), speaker->getVolume(), dsp_gain);
+		setSpeakerDSPGain(speaker->getIP(), -12);
+		
+		//setSpeakerVolume(speaker->getIP(), speaker->getVolume(), dsp_gain);
 	}
 	
 	Base::system().runScript(speaker_ips, commands);
@@ -705,6 +709,8 @@ static double getSoundLevel(const vector<string>& mic_ips) {
 		auto sound_level_linear = getRMS(data, sound_start, sound_stop);
 		auto sound_level_db = 20.0 * log10(sound_level_linear / (double)SHRT_MAX);
 		
+		cout << "Sound level for " << mic_ip << " " << sound_level_db << endl;
+		
 		total_db += sound_level_db;
 	}
 	
@@ -751,6 +757,11 @@ static void showCalibrationScore(const vector<string>& mic_ips) {
 		size_t sound_stop = lround(sound_stop_sec * 48000.0);
 		
 		vector<short> sound(data.begin() + sound_start, data.begin() + sound_stop);
+		
+		double sound_level = getRMS(data, sound_start, sound_stop);
+		sound_level = 20 * log10(sound_level / (double)SHRT_MAX);
+		
+		cout << mic_ip << " sound level " << sound_level << " dB\n";
 		
 		auto fft_output = nac::toDecibel(nac::doFFT(sound));
 		auto applied = fft_output;
@@ -901,12 +912,12 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 			// db / 20 = log10(linear / c)
 			// 10^(db / 20) = linear / c
 			// c * 10^(db / 20) = linear
-			total += (double)SHRT_MAX * pow(10, mic->getSoundLevelFrom(speaker_ips.at(i)) / 20);
-			new_total += (double)SHRT_MAX * pow(10, (mic->getSoundLevelFrom(speaker_ips.at(i)) + gain_difference.at(i)) / 20);
+			total += (double)SHRT_MAX * pow(10, mic->getSoundLevelFrom(speaker_ips.at(i)) / 10);
+			new_total += (double)SHRT_MAX * pow(10, (mic->getSoundLevelFrom(speaker_ips.at(i)) + gain_difference.at(i)) / 10);
 		}
 		
-		total = 20 * log10(total / (double)SHRT_MAX);
-		new_total = 20 * log10(new_total / (double)SHRT_MAX);
+		total = 10 * log10(total / (double)SHRT_MAX);
+		new_total = 10 * log10(new_total / (double)SHRT_MAX);
 		
 		cout << "Microphone " << mic->getIP() << ": total = " << total << " new_total = " << new_total << endl;
 		
@@ -936,6 +947,13 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 }
 
 static double getRelativeSignalGain(int type) {
+	// Don't use this for now
+	// White noise should be the reference for every signal, but playing certain strong frequencies might produce standing waves
+	if (type) {}
+	
+	return 0;
+	
+	#if 0
 	string freq = "data/" + Base::config().get<string>("sound_image_file_short");
 	string noise = "data/" + Base::config().get<string>("white_noise");
 		
@@ -976,6 +994,7 @@ static double getRelativeSignalGain(int type) {
 	cout << "Warning: no type specified\n";
 	
 	return 0;
+	#endif
 }
 
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
@@ -1180,6 +1199,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	if (run_validation) {
 		// Set test white noise settings
 		setSpeakersEQ(speaker_ips, TYPE_WHITE_EQ);
+		
+		// Set desired gain
+		setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain);
 		
 		// Play white noise from all speakers to check sound image & collect the recordings
 		runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
