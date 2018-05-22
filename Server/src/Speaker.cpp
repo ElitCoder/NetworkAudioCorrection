@@ -146,6 +146,7 @@ void Speaker::clearAllEQs() {
 	db_type_ = DB_TYPE_VOLTAGE;
 	sound_levels_.clear();
 	dsp_gain_ = 0;
+	desired_gain_ = 0;
 }
 
 double Speaker::getBestVolume() const {
@@ -278,6 +279,16 @@ void Speaker::setDSPGain(double gain) {
 
 double Speaker::getDSPGain() const {
 	return dsp_gain_;
+}
+
+void Speaker::setDesiredGain(double gain) {
+	desired_gain_ = gain;
+	
+	cout << "Set desired gain to " << gain << " for " << getIP() << endl;
+}
+
+double Speaker::getDesiredGain() const {
+	return desired_gain_;
 }
 
 /*

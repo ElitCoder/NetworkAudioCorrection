@@ -45,6 +45,7 @@ static Config g_config;
 static vector<string> g_ips = { /*"172.25.14.27", "172.25.9.27",*/ "172.25.12.168" }; //, "172.25.9.38", "172.25.12.168", "172.25.13.250", "172.25.11.47" }; //"172.25.15.109", "172.25.14.21" //"172.25.9.38", "172.25.12.99", "172.25.11.47", "172.25.13.250",
 // External microphones
 static vector<string> g_external_microphones = { "172.25.15.233"/*, "172.25.13.82", "172.25.10.134"*/ }; //, "172.25.13.82" };
+static vector<double> g_mic_gains = { -40 };
 
 Packet createStartSpeakerLocalization(const vector<string>& ips, bool force) {
 	Packet packet;
@@ -166,19 +167,23 @@ void speakersOnline() {
 	cout << endl;
 }
 
-Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, bool factor_calibration, int type) {
+Packet createSoundImage(const vector<string>& speakers, const vector<string>& mics, const vector<double>& gains, bool factor_calibration, int type) {
 	Packet packet;
 	packet.addHeader(PACKET_CHECK_SOUND_IMAGE);
 	packet.addBool(factor_calibration);
 	packet.addInt(type);
 	packet.addInt(speakers.size());
 	packet.addInt(mics.size());
+	packet.addInt(gains.size());
 	
 	for (auto& ip : speakers)
 		packet.addString(ip);
 		
 	for (auto& ip : mics)
 		packet.addString(ip);
+		
+	for (auto& gain : gains)
+		packet.addFloat(gain);
 		
 	packet.finalize();
 	return packet;
@@ -198,7 +203,7 @@ void soundImage(int type) {
 	}
 	
 	cout << "\nRunning sound image correction...\t" << flush;
-	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, answer == 'Y', type));
+	g_network->pushOutgoingPacket(createSoundImage(g_ips, g_external_microphones, g_mic_gains, answer == 'Y', type));
 	g_network->waitForIncomingPacket();
 	cout << "done\n\n";
 }
@@ -370,8 +375,16 @@ int main() {
 	const unsigned short PORT = g_config.get<unsigned short>("port");
 	
 	g_ips = g_config.getAll<string>("speakers");
-	g_external_microphones = g_config.getAll<string>("microphones");
+	auto parse_microphones = g_config.getAll<string>("microphones");
 	
+	g_external_microphones.clear();
+	g_mic_gains.clear();
+	
+	for (size_t i = 0; i < parse_microphones.size(); i += 2) {
+		g_external_microphones.push_back(parse_microphones.at(i));
+		g_mic_gains.push_back(stod(parse_microphones.at(i + 1)));
+	}
+		
 	run(HOST, PORT);
 	
 	return 0;

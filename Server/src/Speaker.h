@@ -53,6 +53,7 @@ public:
 	// Mic setters
 	void setFrequencyResponseFrom(const std::string& ip, const std::vector<double>& dbs);
 	void setSoundLevelFrom(const std::string& ip, double level);
+	void setDesiredGain(double gain);
 	
 	// SpeakerPlacement setters
 	void setPlacement(const SpeakerPlacement& placement, int placement_id);
@@ -75,6 +76,7 @@ public:
 	// Mic getters
 	std::vector<double> getFrequencyResponseFrom(const std::string& ip) const;
 	double getSoundLevelFrom(const std::string& ip) const;
+	double getDesiredGain() const;
 	
 	// SpeakerPlacement getters
 	const SpeakerPlacement& getPlacement() const;
@@ -96,10 +98,11 @@ private:
 	std::unordered_map<std::string, double> sound_levels_;
 	
 	// Basic members
-	std::string ip_		= "not set";
-	double volume_		= 0;
-	bool online_		= false;
-	double dsp_gain_	= 0;
+	std::string ip_			= "not set";
+	double volume_			= 0;
+	bool online_			= false;
+	double dsp_gain_		= 0;
+	double desired_gain_	= 0;
 
 	// Placement members
 	SpeakerPlacement placement_;

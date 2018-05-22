@@ -28,7 +28,6 @@ enum {
 };
 
 extern Connection* g_current_connection;
-extern double g_target_db_level;
 extern vector<double> g_customer_profile;
 
 static void handle(Connection& connection, Packet& input_packet) {
@@ -114,24 +113,34 @@ static void handle(Connection& connection, Packet& input_packet) {
 		case PACKET_CHECK_SOUND_IMAGE: {
 			vector<string> speakers;
 			vector<string> mics;
+			vector<double> gains;
 			
 			bool factor_calibration = input_packet.getBool();
 			int type = input_packet.getInt();
 			int num_speakers = input_packet.getInt();
 			int num_mics = input_packet.getInt();
+			int num_gains = input_packet.getInt();
 			
 			for (int i = 0; i < num_speakers; i++)
 				speakers.push_back(input_packet.getString());
 				
 			for (int i = 0; i < num_mics; i++)
 				mics.push_back(input_packet.getString());
+				
+			for (int i = 0; i < num_gains; i++)
+				gains.push_back(input_packet.getFloat());
 
-			Handle::checkSoundImage(speakers, mics, factor_calibration, type);
+			Handle::checkSoundImage(speakers, mics, gains, factor_calibration, type);
 			
 			break;
 		}
 		
 		case PACKET_SET_BEST_EQ: {
+			cout << "Warning: not implemented!\n";
+			
+			break;
+			
+			#if 0
 			vector<string> speakers;
 			vector<string> mics;
 			int num_speakers = input_packet.getInt();
@@ -146,6 +155,7 @@ static void handle(Connection& connection, Packet& input_packet) {
 			Handle::setBestEQ(speakers, mics);
 			
 			break;
+			#endif
 		}
 		
 		case PACKET_SET_EQ_STATUS: {
@@ -239,7 +249,6 @@ int main() {
 	Base::system().setSpeakerProfile(speaker);
 	Base::system().setMicrophoneProfile(microphone);
 	
-	g_target_db_level = Base::config().get<double>("target_db_level");
 	g_customer_profile = Base::config().getAll<double>("customer_profile");
 	
 	// For testing
