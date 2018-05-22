@@ -14,7 +14,7 @@ play_time: 30
 idle_time: 1
 play_time_freq: 3
 play_time_localization: 1
-validate_white_noise: 0
+validate_white_noise: 1
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -29,7 +29,7 @@ dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
 dsp_eq_q: 1
 dsp_eq_max: 12
 dsp_eq_min: -12
-enable_customer_profile: 0
+enable_customer_profile: 1
 customer_profile: 6 4 2 -2 -1 -3 -2 -1 3
 enable_hardware_profile: 0
 hardware_profile_boost_steeps: 0

@@ -20,4 +20,4 @@ port: 10200
 
 # test speakers
 speakers: 172.25.14.27 172.25.12.99
-microphones: 172.25.13.82 -45
+microphones: 172.25.13.82 -45 172.25.13.67 -42

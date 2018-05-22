@@ -310,7 +310,13 @@ static void setGain(const vector<string>& speaker_ips, const vector<double>& gai
 	
 	for (size_t i = 0; i < speaker_ips.size(); i++) {
 		auto& speaker = Base::system().getSpeaker(speaker_ips.at(i));
-		auto& gain = gains.at(i);
+		auto gain = gains.at(i);
+		
+		if (gain > 0) {
+			cout << "Warning: gain > 0, setting to 0\n";
+			
+			gain = 0;
+		}
 		
 		unsigned char bytes[4];
 		to_523(dB_to_linear_gain(gain), bytes);
@@ -958,62 +964,78 @@ static void addCustomerEQ(const vector<string>& speaker_ips) {
 		speaker->addCustomerEQ(g_customer_profile);
 }
 
-static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vector<string>& mic_ips, double adjusted_final_gain) {
-	// We know that the calibration ran using calibration_safe_gain
-	double dsp_calibration_level = Base::config().get<double>("calibration_safe_gain");
-	vector<double> gain_difference;
-	vector<double> changes;
-	
+static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vector<string>& mic_ips, double adjusted_final_gain, bool only_check_dsp_gain) {
 	auto speakers = Base::system().getSpeakers(speaker_ips);
-	auto microphones = Base::system().getSpeakers(mic_ips);
-	
-	// Difference compared to calibration test
-	for (auto* speaker : speakers)
-		gain_difference.push_back(speaker->getDSPGain() - dsp_calibration_level);
-		
-	// Check every microphone
-	for (auto* mic : microphones) {
-		double total = 0;
-		double new_total = 0;
-		
-		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			// Inverse:
-			// db = 20 * log10(linear / c)
-			// db / 20 = log10(linear / c)
-			// 10^(db / 20) = linear / c
-			// c * 10^(db / 20) = linear
-			total += (double)SHRT_MAX * pow(10, mic->getSoundLevelFrom(speaker_ips.at(i)) / 10);
-			new_total += (double)SHRT_MAX * pow(10, (mic->getSoundLevelFrom(speaker_ips.at(i)) + gain_difference.at(i)) / 10);
-		}
-		
-		total = 10 * log10(total / (double)SHRT_MAX);
-		new_total = 10 * log10(new_total / (double)SHRT_MAX);
-		
-		cout << "Microphone " << mic->getIP() << ": total = " << total << " new_total = " << new_total << endl;
-		
-		// Since the test signals differ, the actual level according to the reference is
-		cout << "actual_total " << new_total + adjusted_final_gain << endl;
-		
-		changes.push_back(mic->getDesiredGain() - (new_total + adjusted_final_gain));
-	}
-	
-	// Weigth gain
-	auto final_change = weightGain(speaker_ips, mic_ips, changes);
 	vector<double> final_gains;
 	
-	// Only set for one mic for now
-	for (size_t i = 0; i < speakers.size(); i++) {
-		auto* speaker = speakers.at(i);
+	if (!only_check_dsp_gain) {
+		// We know that the calibration ran using calibration_safe_gain
+		double dsp_calibration_level = Base::config().get<double>("calibration_safe_gain");
+		vector<double> gain_difference;
+		vector<double> changes;
 		
-		// Don't exceed the DSP limit
-		if (speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) > 0) {
-			cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) << ")\n";
-			final_gains.push_back(-speaker->getLoudestBestEQ());
+		auto microphones = Base::system().getSpeakers(mic_ips);
+		
+		// Difference compared to calibration test
+		for (auto* speaker : speakers)
+			gain_difference.push_back(speaker->getDSPGain() - dsp_calibration_level);
 			
-			continue;
+		// Check every microphone
+		for (auto* mic : microphones) {
+			double total = 0;
+			double new_total = 0;
+			
+			for (size_t i = 0; i < speaker_ips.size(); i++) {
+				// Inverse:
+				// db = 20 * log10(linear / c)
+				// db / 20 = log10(linear / c)
+				// 10^(db / 20) = linear / c
+				// c * 10^(db / 20) = linear
+				total += (double)SHRT_MAX * pow(10, mic->getSoundLevelFrom(speaker_ips.at(i)) / 10);
+				new_total += (double)SHRT_MAX * pow(10, (mic->getSoundLevelFrom(speaker_ips.at(i)) + gain_difference.at(i)) / 10);
+			}
+			
+			total = 10 * log10(total / (double)SHRT_MAX);
+			new_total = 10 * log10(new_total / (double)SHRT_MAX);
+			
+			cout << "Microphone " << mic->getIP() << ": total = " << total << " new_total = " << new_total << endl;
+			
+			// Since the test signals differ, the actual level according to the reference is
+			cout << "actual_total " << new_total + adjusted_final_gain << endl;
+			
+			changes.push_back(mic->getDesiredGain() - (new_total + adjusted_final_gain));
 		}
 		
-		final_gains.push_back(speaker->getDSPGain() + final_change.at(i));
+		// Weight gain
+		auto final_change = weightGain(speaker_ips, mic_ips, changes);
+		
+		for (size_t i = 0; i < speakers.size(); i++) {
+			auto* speaker = speakers.at(i);
+			
+			// Don't exceed the DSP limit
+			if (speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) > 0) {
+				cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) << ")\n";
+				final_gains.push_back(-speaker->getLoudestBestEQ());
+				
+				continue;
+			}
+			
+			final_gains.push_back(speaker->getDSPGain() + final_change.at(i));
+		}
+	} else {
+		for (size_t i = 0; i < speakers.size(); i++) {
+			auto* speaker = speakers.at(i);
+			
+			// Don't exceed the DSP limit
+			if (speaker->getDSPGain() + speaker->getLoudestBestEQ() > 0) {
+				cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() << ")\n";
+				final_gains.push_back(-speaker->getLoudestBestEQ());
+				
+				continue;
+			}
+			
+			final_gains.push_back(speaker->getDSPGain());
+		}
 	}
 	
 	setGain(speaker_ips, final_gains);
@@ -1273,7 +1295,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		mics.at(i)->setDesiredGain(gains.at(i));
 	
 	setEQ(speaker_ips, TYPE_BEST_EQ);
-	setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain);
+	setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain, false);
 	
 	if (run_validation) {
 		// Play white noise from all speakers to check sound image & collect the recordings
@@ -1292,6 +1314,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		addCustomerEQ(speaker_ips);
 		
 		setEQ(speaker_ips, TYPE_BEST_EQ);
+		setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain, true);
 	}
 	
 	// Check desired gain for every microphone
