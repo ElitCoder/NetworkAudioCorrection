@@ -42,3 +42,5 @@ target_db_level: 0
 calibration_safe_gain: -12
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
 safe_dsp_max: 1500
+# Actual dBSPL level in mic recording level, e.g -40 dB ~ 80 dbSPL
+actual_db_level: -40

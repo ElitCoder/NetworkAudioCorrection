@@ -296,6 +296,28 @@ static vector<double> getSoundImageCorrection(vector<double> dbs) {
 	return eq;
 }
 
+static void setSpeakerDSPGain(const string& ip, double gain) {
+	unsigned char bytes[4];
+	to_523(dB_to_linear_gain(gain), bytes);
+	string hex_string = getHexString(bytes, 4);
+	string hex_bytes = "";
+	
+	cout << "Setting DSP gain bytes to " << hex_string << endl;
+	cout << "For level " << gain << " dB\n";
+	
+	for (size_t i = 0; i < hex_string.length(); i += 2) 
+		hex_bytes += "0x" + hex_string.substr(i, 2) + ",";
+		
+	hex_bytes.pop_back();	
+	
+	string command =	"amixer -c1 cset numid=170 ";
+	command +=			hex_bytes;
+	command +=			"; wait\n";
+	
+	Base::system().runScript({ ip }, { command });
+	Base::system().getSpeaker(ip).setDSPGain(gain);
+}
+
 static void setSpeakerVolume(const string& ip, double volume, double base_dsp_level) {
 	auto& speaker = Base::system().getSpeaker(ip);	
 	speaker.setVolume(volume);
@@ -313,25 +335,7 @@ static void setSpeakerVolume(const string& ip, double volume, double base_dsp_le
 		final_level = 0;
 	}
 	
-	unsigned char bytes[4];
-	to_523(dB_to_linear_gain(final_level), bytes);
-	string hex_string = getHexString(bytes, 4);
-	string hex_bytes = "";
-	
-	cout << "Setting DSP gain bytes to " << hex_string << endl;
-	cout << "For level " << final_level << " dB\n";
-	
-	for (size_t i = 0; i < hex_string.length(); i += 2) 
-		hex_bytes += "0x" + hex_string.substr(i, 2) + ",";
-		
-	hex_bytes.pop_back();	
-	
-	string command =	"amixer -c1 cset numid=170 ";
-	command +=			hex_bytes;
-	command +=			"; wait\n";
-	
-	Base::system().runScript({ ip }, { command });
-	speaker.setDSPGain(final_level);
+	setSpeakerDSPGain(ip, final_level);
 }
 
 static void setSpeakersEQ(const vector<string>& speaker_ips, int type) {
@@ -458,6 +462,42 @@ static vector<vector<double>> weightEQs(const vector<string>& speaker_ips, const
 	}
 	
 	return final_eqs;
+}
+
+static vector<double> weightGain(const vector<string>& speaker_ips, const vector<string>& mic_ips, const vector<double>& changes) {
+	vector<double> linear_sound_levels(speaker_ips.size(), 0);
+	vector<double> final_change(speaker_ips.size(), 0);
+	
+	// Total sound level
+	// Go through microphones
+	for (size_t i = 0; i < mic_ips.size(); i++) {
+		// Go through speakers
+		for (size_t j = 0; j < speaker_ips.size(); j++) {
+			auto sound_level = Base::system().getSpeaker(mic_ips.at(i)).getSoundLevelFrom(speaker_ips.at(j));
+			double linear = (double)SHRT_MAX * pow(10, sound_level / 20);
+			
+			linear_sound_levels.at(j) += linear;
+		}
+	}
+	
+	// Set weights
+	// Go through microphones
+	for (size_t i = 0; i < mic_ips.size(); i++) {
+		// Go through speakers
+		for (size_t j = 0; j < speaker_ips.size(); j++) {
+			auto sound_level = Base::system().getSpeaker(mic_ips.at(i)).getSoundLevelFrom(speaker_ips.at(j));
+			
+			double linear = (double)SHRT_MAX * pow(10, sound_level / 20);
+			double weight = linear / linear_sound_levels.at(j);
+			
+			double wanted_change = changes.at(i) * weight;
+			final_change.at(j) += wanted_change;
+			
+			cout << "Microphone " << mic_ips.at(i) << " added " << wanted_change << " to " << speaker_ips.at(j) << " with weight " << weight << " and actual change " << changes.at(i) << endl;
+		}
+	}
+	
+	return final_change;
 }
 
 static void runFrequencyResponseScripts(const vector<string>& speakers, const vector<string>& mics, const string& filename, int play) {
@@ -837,10 +877,11 @@ static void addCustomerEQ(const vector<string>& speaker_ips) {
 		speaker->addCustomerEQ(g_customer_profile);
 }
 
-static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vector<string>& mic_ips) {
+static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vector<string>& mic_ips, double adjusted_final_gain) {
 	// We know that the calibration ran using calibration_safe_gain
 	double dsp_calibration_level = Base::config().get<double>("calibration_safe_gain");
 	vector<double> gain_difference;
+	vector<double> changes;
 	
 	auto speakers = Base::system().getSpeakers(speaker_ips);
 	auto microphones = Base::system().getSpeakers(mic_ips);
@@ -868,10 +909,79 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 		new_total = 20 * log10(new_total / (double)SHRT_MAX);
 		
 		cout << "Microphone " << mic->getIP() << ": total = " << total << " new_total = " << new_total << endl;
+		
+		// Since the test signals differ, the actual level according to the reference is
+		cout << "actual_total " << new_total + adjusted_final_gain << endl;
+		
+		changes.push_back(Base::config().get<double>("actual_db_level") - (new_total + adjusted_final_gain));
+	}
+	
+	// Weigth gain
+	auto final_change = weightGain(speaker_ips, mic_ips, changes);
+	
+	// Only set for one mic for now
+	for (size_t i = 0; i < speakers.size(); i++) {
+		auto* speaker = speakers.at(i);
+		
+		// Don't exceed the DSP limit
+		if (speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) > 0) {
+			cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) << ")\n";
+			setSpeakerDSPGain(speaker->getIP(), -speaker->getLoudestBestEQ());
+			
+			continue;
+		}
+			
+		setSpeakerDSPGain(speaker->getIP(), speaker->getDSPGain() + final_change.at(i));
 	}
 }
 
+static double getRelativeSignalGain(int type) {
+	string freq = "data/" + Base::config().get<string>("sound_image_file_short");
+	string noise = "data/" + Base::config().get<string>("white_noise");
+		
+	vector<short> freq_data;
+	vector<short> noise_data;
+	
+	WavReader::read(freq, freq_data);
+	WavReader::read(noise, noise_data);
+	
+	double freq_level = getRMS(freq_data, 0, freq_data.size());
+	freq_level = 20 * log10(freq_level / (double)SHRT_MAX);
+	
+	double noise_level = getRMS(noise_data, 0, noise_data.size());
+	noise_level = 20 * log10(noise_level / (double)SHRT_MAX);
+	
+	cout << "freq_level " << freq_level << endl;
+	cout << "noise_level " << noise_level << endl;
+	
+	#if 0
+	string sound_file = "data/shape.wav";
+	vector<short> data;
+	WavReader::read(sound_file, data);
+	double level = getRMS(data, 0, data.size());
+	level = 20 * log10(level / (double)SHRT_MAX);
+	
+	cout << "level " << level << endl;
+	#endif
+	
+	switch (type) {
+		case WHITE_NOISE: return freq_level - noise_level;
+			break;
+		
+		// Reference since it is loudest
+		case NINE_FREQ: return 0;
+			break;
+	}
+	
+	cout << "Warning: no type specified\n";
+	
+	return 0;
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, bool factor_calibration, int type) {
+	auto adjusted_final_gain = getRelativeSignalGain(type);
+	cout << "adjusted_final_gain " << adjusted_final_gain << endl;
+	
 	// Set g_dsp_factor
 	bool run_white_noise = false;
 	bool run_validation = Base::config().get<bool>("validate_white_noise");
@@ -952,7 +1062,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	// Run frequency responses
 	if (run_white_noise) {
-		if (speaker_ips.size() > 1) {
+		if (speaker_ips.size() > 1 || !run_validation) {
 			runFrequencyResponseScripts(speaker_ips, mic_ips, Base::config().get<string>("white_noise"), Base::config().get<int>("play_time"));
 			Base::system().getRecordings(mic_ips);
 		}
@@ -1086,13 +1196,13 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	if (Base::config().get<bool>("enable_customer_profile"))
 		addCustomerEQ(speaker_ips);
 	
-	// Reset mics & set best EQ
-	resetEverything(mic_ips);
+	// Set best EQ
 	setSpeakersEQ(speaker_ips, TYPE_BEST_EQ);
 	
 	// Check desired gain for every microphone
-	setCalibratedSoundLevel(speaker_ips, mic_ips);
+	setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain);
 	
+	resetEverything(mic_ips);
 	enableAudioSystem(all_ips);
 }
 
