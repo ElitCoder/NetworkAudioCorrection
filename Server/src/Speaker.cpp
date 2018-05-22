@@ -64,7 +64,11 @@ double Speaker::getLoudestBestEQ() const {
 		return 0;
 		
 	auto max_frequency = Base::config().get<int>("safe_dsp_max");
-	int frequency_index = max_frequency == 0 ? 0 : Base::system().getSpeakerProfile().getFrequencyIndex(max_frequency) + 1;
+	
+	if (max_frequency == 0)
+		return max(0.0, *max_element(current_best_eq_.begin(), current_best_eq_.end()));
+		
+	int frequency_index = Base::system().getSpeakerProfile().getFrequencyIndex(max_frequency);
 	
 	return max(0.0, *max_element(current_best_eq_.begin(), current_best_eq_.begin() + frequency_index));
 }
