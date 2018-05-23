@@ -41,3 +41,4 @@ hardware_profile_cutoff_high: 17000
 calibration_safe_gain: -12
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
 safe_dsp_max: 800
+enable_sound_level_adjustment: 1
