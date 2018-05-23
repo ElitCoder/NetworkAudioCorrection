@@ -1366,8 +1366,8 @@ static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 	vector<short> real(samples.begin() + start, samples.begin() + stop);
 	
 	auto before = nac::doFFT(real);
-	before = nac::toDecibel(before);
-	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+	//before = nac::toDecibel(before);
+	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
 	
 	for (size_t i = 0; i < g_last_eq.size(); i++)
 		cout << eq.at(i) - g_last_eq.at(i) << " ";
@@ -1392,25 +1392,31 @@ void Handle::testing() {
 	double tmp;
 	file >> tmp;
 	
-	vector<double> eq;
+	vector<pair<int, double>> eq;
 	
 	for (int i = 0; i < 9; i++) {
 		file >> tmp;
 		
-		eq.push_back(tmp);
+		eq.push_back({ stoi(g_frequencies.at(i)), tmp });
 	}
 	
 	file.close();
 	
-	Filter filter;
+	//for (auto& setting : eq)
+	//	setting.second = 3;
+	
+	FilterBank filter;
 	
 	for (auto& frequency : g_frequencies)
 		filter.addBand(stoi(frequency), 1);
 	
+	//filter.addBand(125, 2);
+	//filter.addBand(4000, 2);
+			
 	auto before_samples = plotFFTFile("before.wav");
 	
 	vector<short> simulated_samples;
-	filter.apply(before_samples, simulated_samples, eq, 48000);
+	filter.apply(before_samples, simulated_samples, eq, 48000, 2 * 48000, 30 * 48000);
 	plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
 	
 	WavReader::write("after.wav", simulated_samples, "real_after.wav");
@@ -1418,6 +1424,6 @@ void Handle::testing() {
 	auto after_samples = plotFFTFile("real_after.wav");
 	
 	for (auto& setting : eq)
-		cout << setting << " ";
+		cout << setting.second << " ";
 	cout << endl;
 }

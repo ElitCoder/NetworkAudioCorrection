@@ -165,6 +165,10 @@ namespace nac {
 		return fitBands(input, eq_settings, false);
 	}
 	
+	vector<double> findSimulatedEQSettings(const vector<short>& samples, const Filter& filter) {
+		return vector<double>();
+	}
+	
 	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
 		auto& eq_frequencies = eq_settings.first;
 		//auto& q = eq_settings.second;

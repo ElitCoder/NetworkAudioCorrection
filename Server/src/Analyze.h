@@ -8,6 +8,7 @@
 using FFTOutput = std::pair<std::vector<double>, std::vector<double>>;
 
 class Profile;
+class Filter;
 
 // NetworkAudioCorrection
 namespace nac {
@@ -17,6 +18,7 @@ namespace nac {
 	FFTOutput toDecibel(const FFTOutput& input);
 	std::vector<double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings, bool input_db);
 	std::vector<double> getEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
+	std::vector<double> findSimulatedEQSettings(const std::vector<short>& samples, const Filter& filter);
 }
 
 #endif
