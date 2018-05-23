@@ -181,8 +181,8 @@ namespace nac {
 			band_limits.push_back(lower);
 			band_limits.push_back(upper);
 			
-			cout << "Added band limit " << lower << endl;
-			cout << "Added band limit " << upper << endl;
+			//cout << "Added band limit " << lower << endl;
+			//cout << "Added band limit " << upper << endl;
 		}
 		
 		vector<double> energy(eq_frequencies.size(), 0);

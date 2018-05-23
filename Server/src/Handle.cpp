@@ -9,6 +9,7 @@
 #include "System.h"
 #include "Config.h"
 #include "Analyze.h"
+#include "Filter.h"
 
 #include <iostream>
 #include <cmath>
@@ -1359,22 +1360,64 @@ void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
 		Base::system().runScript(ips, vector<string>(ips.size(), disable));
 }
 
+static vector<double> g_last_eq(9, 0);
+
+static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
+	vector<short> real(samples.begin() + start, samples.begin() + stop);
+	
+	auto before = nac::doFFT(real);
+	before = nac::toDecibel(before);
+	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+	
+	for (size_t i = 0; i < g_last_eq.size(); i++)
+		cout << eq.at(i) - g_last_eq.at(i) << " ";
+	cout << endl;
+	
+	g_last_eq = eq;
+}
+
+static vector<short> plotFFTFile(const string& file) {
+	vector<short> samples;
+	WavReader::read(file, samples);
+	
+	plotFFT(samples, 2 * 48000, 30 * 48000);
+	
+	return samples;
+}
+
 void Handle::testing() {
-	#if 0
-	try {
-		string filename = "before.wav";
-		vector<short> data;
-		WavReader::read(filename, data);
-		data = vector<short>(data.begin() + 48000 * 2, data.begin() + 48000 * 30);
+	ifstream file("eqs");
+	
+	// Ignore number
+	double tmp;
+	file >> tmp;
+	
+	vector<double> eq;
+	
+	for (int i = 0; i < 9; i++) {
+		file >> tmp;
 		
-		auto& speaker_profile = Base::system().getSpeakerProfile();
-		
-		auto difference = nac::getDecibelDifference(nac::doFFT(data), g_target_mean);
-		auto applied = nac::applyProfiles(difference, Base::system().getSpeakerProfile(), Base::system().getMicrophoneProfile());
-		auto final_eq = nac::getEQ(applied, speaker_profile.getSpeakerEQ());
-	} catch (...) {
-		// Testing method failed, we don't care
-		return;
+		eq.push_back(tmp);
 	}
-	#endif
+	
+	file.close();
+	
+	Filter filter;
+	
+	for (auto& frequency : g_frequencies)
+		filter.addBand(stoi(frequency), 1);
+	
+	auto before_samples = plotFFTFile("before.wav");
+	
+	vector<short> simulated_samples;
+	filter.apply(before_samples, simulated_samples, eq, 48000);
+	plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
+	
+	WavReader::write("after.wav", simulated_samples, "real_after.wav");
+	
+	auto after_samples = plotFFTFile("real_after.wav");
+	
+	for (auto& setting : eq)
+		cout << setting << " ";
+	cout << endl;
 }

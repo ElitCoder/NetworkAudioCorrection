@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 
+// From SO
 struct WavHeader {
 	/* RIFF Chunk Descriptor */
 	uint8_t         RIFF[4];        // RIFF Header Magic header
@@ -28,6 +29,7 @@ struct WavHeader {
 class WavReader {
 public:
 	static void read(const std::string& filename, std::vector<short>& output);
+	static void write(const std::string& filename, const std::vector<short>& input, const std::string& copy_header = "");
 };
 
 #endif
