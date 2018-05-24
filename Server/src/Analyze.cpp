@@ -279,7 +279,7 @@ namespace nac {
 			if (db_std_dev < 0.1 && best_eq.size() > 0)
 				break;
 			
-			if (abs(db_std_dev - last_dev) < 0.01 && best_eq.size() > 0 && i > 10)
+			if (abs(db_std_dev - last_dev) < 0.01 && best_eq.size() > 0 && i > 5)
 				break;
 				
 			last_dev = db_std_dev;
@@ -323,8 +323,13 @@ namespace nac {
 		vector<double> energy(eq_frequencies.size(), 0);
 		vector<double> num(eq_frequencies.size(), 0);
 		
-		auto& frequencies = input.first;
-		auto& dbs = input.second;
+		FFTOutput actual = input;
+		
+		if (!input_db)
+			actual = nac::toDecibel(actual);
+			
+		auto& frequencies = actual.first;
+		auto& dbs = actual.second;
 		
 		for (size_t i = 0; i < dbs.size(); i++) {
 			auto& frequency = frequencies.at(i);
@@ -345,8 +350,8 @@ namespace nac {
 			energy.at(i) /= num.at(i);
 			
 			// Convert to dB
-			if (!input_db)
-				energy.at(i) = 10 * log10(energy.at(i));
+			//if (!input_db)
+			//	energy.at(i) = 10 * log10(energy.at(i));
 			
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
 		}
