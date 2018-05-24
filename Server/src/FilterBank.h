@@ -30,17 +30,6 @@ private:
 		
 		std::vector<double> a_;
 		std::vector<double> b_;
-		
-		/*
-		double a0;
-		double a1;
-		double a2;
-		double b1;
-		double b2;
-		
-		double z1;
-		double z2;
-		*/
 	};
 	
 	std::vector<Filter> filters_;

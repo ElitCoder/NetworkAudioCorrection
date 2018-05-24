@@ -239,7 +239,8 @@ int main() {
 	g_customer_profile = Base::config().getAll<double>("customer_profile");
 	
 	// For testing
-	Handle::testing();
+	if (Base::config().get<bool>("enable_testing"))
+		Handle::testing();
 	
 	// Initialize curlpp
 	curlpp::initialize();

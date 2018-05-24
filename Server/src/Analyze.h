@@ -13,7 +13,7 @@ class FilterBank;
 
 // NetworkAudioCorrection
 namespace nac {
-	FFTOutput doFFT(const std::vector<short>& samples);
+	FFTOutput doFFT(const std::vector<short>& samples, size_t start = 0, size_t stop = 0);
 	FFTOutput getDifference(const FFTOutput& input, double target, bool use_mean);
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile);
 	
@@ -22,7 +22,7 @@ namespace nac {
 	
 	std::pair<std::vector<double>, double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings, bool input_db, const std::vector<int>& ignore_bands = std::vector<int>());
 	std::vector<double> getEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
-	std::vector<double> findSimulatedEQSettings(const std::vector<short>& samples, FilterBank& filter, size_t start = 0, size_t stop = 0);
+	std::vector<double> findSimulatedEQSettings(const std::vector<short>& samples, FilterBank& filter, size_t start, size_t stop);
 }
 
 #endif

@@ -1210,17 +1210,20 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		play = Base::config().get<int>("play_time_freq");
 	
 	// Wanted EQs by microphones
-	MicWantedEQ wanted_eqs;
+	MicWantedEQ wanted_eqs(mic_ips.size());
 	
 	// Go through frequency analysis
-	for (auto& mic_ip : mic_ips) {
+	#pragma omp parallel for
+	for (size_t z = 0; z < mic_ips.size(); z++) {
+		auto& mic_ip = mic_ips.at(z);
 		string filename = "results/cap" + mic_ip + ".wav";
 		
 		vector<short> data;
 		WavReader::read(filename, data);
 		
-		vector<vector<double>> new_eqs;
+		vector<vector<double>> new_eqs(speaker_ips.size());
 		
+		#pragma omp parallel for
 		for (size_t i = 0; i < speaker_ips.size(); i++) {
 			double sound_start_sec = static_cast<double>(idle) * 2 + (i * (play + idle));
 			double sound_stop_sec = sound_start_sec + play - idle * 2;
@@ -1331,17 +1334,20 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				final_eq = eq;
 			}
 			
-			new_eqs.push_back(final_eq);
+			new_eqs.at(i) = final_eq;
 			
 			double sound_level = getRMS(data, sound_start, sound_stop);
 			sound_level = 20 * log10(sound_level / (double)SHRT_MAX);
 			
-			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
-			Base::system().getSpeaker(mic_ip).setSoundLevelFrom(speaker_ips.at(i), sound_level);
+			#pragma omp critical
+			{
+				Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
+				Base::system().getSpeaker(mic_ip).setSoundLevelFrom(speaker_ips.at(i), sound_level);
+			}
 		}
 		
 		// Add this to further calculations when we have all the information
-		wanted_eqs.push_back(new_eqs);
+		wanted_eqs.at(z) = new_eqs;
 	}
 	
 	// Weight data against profile and microphones
@@ -1455,14 +1461,7 @@ static vector<short> plotFFTFile(const string& file) {
 }
 
 void Handle::testing() {
-	return;
-	
 	try {
-		auto before = plotFFTFile("before.wav");
-		auto final_eq = nac::findSimulatedEQSettings(before, Base::system().getSpeakerProfile().getFilter(), 2 * 48000, 30 * 48000);
-		
-		return;
-		
 		ifstream file("eqs");
 		
 		// Ignore number
@@ -1479,16 +1478,10 @@ void Handle::testing() {
 		
 		file.close();
 		
-		//for (auto& setting : eq)
-		//	setting.second = 3;
-		
 		FilterBank filter;
 		
 		for (auto& frequency : g_frequencies)
 			filter.addBand(stoi(frequency), 1);
-		
-		//filter.addBand(125, 2);
-		//filter.addBand(4000, 2);
 
 		auto before_samples = plotFFTFile("before.wav");
 		
@@ -1496,13 +1489,31 @@ void Handle::testing() {
 		filter.apply(before_samples, simulated_samples, eq, 48000);
 		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
 		
-		WavReader::write("after.wav", simulated_samples, "real_after.wav");
+		auto after_samples = plotFFTFile("after.wav");
 		
-		auto after_samples = plotFFTFile("real_after.wav");
+		#if 0
+		auto final_eq = nac::findSimulatedEQSettings(before_samples, filter, 2 * 48000, 30 * 48000);
 		
+		cout << "Simulated EQ: ";
+		for (auto& setting : final_eq)
+			cout << setting << " ";
+		cout << endl;
+		#endif
+		
+		cout << "Actual EQ: ";
 		for (auto& setting : eq)
 			cout << setting.second << " ";
 		cout << endl;
+		
+		#if 0
+		for (size_t i = 0; i < eq.size(); i++)
+			eq.at(i).second = final_eq.at(i);
+			
+		filter.apply(before_samples, simulated_samples, eq, 48000);
+		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
+		
+		WavReader::write("simulated_after.wav", simulated_samples, "after.wav");
+		#endif
 	} catch (...) {
 		cout << "Testing failed, don't care\n";
 	}

@@ -74,56 +74,27 @@ static double correctMaxEQ(vector<double>& eq) {
 	return total_mean_change;
 }
 
-#if 0
-static int getClosestIndex(double frequency, const vector<double>& container) {
-	double closest = INT_MAX;
-	int closest_index = -1;
-	
-	for (size_t i = 0; i < container.size(); i++) {
-		double distance = abs(container.at(i) - frequency);
-		
-		if (distance < closest) {
-			closest = distance;
-			closest_index = i;
-		}
-	}
-	
-	return closest_index;
-}
-#endif
-
 namespace nac {
-	FFTOutput doFFT(const vector<short>& samples) {
+	FFTOutput doFFT(const vector<short>& samples, size_t start, size_t stop) {
 		vector<double> in;
 		
-		for (auto& sample : samples)
-			in.push_back((double)sample / (double)SHRT_MAX);
+		// Normalize to [0, 1]
+		for (size_t i = start; i < (stop == 0 ? samples.size() : stop); i++)
+			in.push_back((double)samples.at(i) / (double)SHRT_MAX);
 		
 		const int N = 8192;
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
-		
-		for (auto& element : y)
-			output.push_back(element);
-
-		// Output is [0, fs)
-		output = vector<double>(output.begin(), output.begin() + output.size() / 2);
-			
-		cout << "mean(output) " << mean(output) << endl;
-		cout << "output.size() " << output.size() << endl;
-		cout << "N " << N << endl;
-		
 		vector<double> frequencies;
 		
-		for (size_t i = 0; i < output.size(); i++) {
+		// pwelch() output is [0, fs)
+		for (size_t i = 0; i < y.size() / 2; i++) {
 			double frequency = i * 48000.0 / N;
 			
 			frequencies.push_back(frequency);
+			output.push_back(y.at(i));
 		}
-		
-		double std_dev = calculateSD(output);
-		cout << "std_dev " << std_dev << endl;
 			
 		return { frequencies, output };
 	}
@@ -208,9 +179,7 @@ namespace nac {
 		vector<double> best_eq;
 		double best_score = INT_MAX;
 		
-		double last_dev = 0;
-		
-		for (int i = 0; i < 100; i++) {
+		for (int i = 0; i < Base::config().get<int>("max_simulation_iterations"); i++) {
 			correctMaxEQ(eq_change);
 			
 			vector<pair<int, double>> gains;
@@ -227,15 +196,13 @@ namespace nac {
 			filter.apply(samples, simulated_samples, gains, 48000);
 			
 			// Find basic EQ change
-			vector<short> scaled_samples(simulated_samples.begin() + start, simulated_samples.begin() + stop);
-			auto response = nac::doFFT(scaled_samples);
-			auto applied = response;
+			auto response = nac::doFFT(simulated_samples, start, stop);
 			
 			cout << "Transformed to:\n";
-			auto peer = nac::fitBands(applied, speaker_eq, false);
+			auto peer = nac::fitBands(response, speaker_eq, false);
 			
 			if (Base::config().get<bool>("enable_hardware_profile")) {
-				applied = nac::toDecibel(applied);
+				response = nac::toDecibel(response);
 				
 				auto speaker_profile = Base::system().getSpeakerProfile().invert();
 				auto mic_profile = Base::system().getMicrophoneProfile().invert();
@@ -245,25 +212,17 @@ namespace nac {
 					mic_profile = Base::system().getMicrophoneProfile();
 				}
 				
-				applied = nac::applyProfiles(applied, speaker_profile, mic_profile);
+				response = nac::applyProfiles(response, speaker_profile, mic_profile);
 				
 				// Revert back to energy
-				applied = nac::toLinear(applied);
-				
-				vector<int> ignore;
-				auto index = speaker_profile.getFrequencyIndex(speaker_profile.getLowCutOff());
-				
-				if (index > 0) {
-					while (index > 0)
-						ignore.push_back(--index);
-				}
+				response = nac::toLinear(response);
 				
 				cout << "After hardware profile:\n";
-				peer = nac::fitBands(applied, speaker_eq, false, ignore);
+				peer = nac::fitBands(response, speaker_eq, false);
 			}
 			
-			auto negative_curve = peer.first;
-			auto db_std_dev = peer.second;
+			auto& negative_curve = peer.first;
+			auto& db_std_dev = peer.second;
 
 			// Negative response to get change curve
 			vector<double> eq;
@@ -276,17 +235,12 @@ namespace nac {
 				best_eq = eq_change;
 			}
 			
-			if (db_std_dev < 0.1 && best_eq.size() > 0)
-				break;
-			
-			if (abs(db_std_dev - last_dev) < 0.01 && best_eq.size() > 0 && i > 5)
-				break;
-				
-			last_dev = db_std_dev;
-			
-			//correctMaxEQ(eq);
-			//eq.front() = eq.at(1) / 2;
-			//correctMaxEQ(eq);
+			if (!best_eq.empty()) {
+				if (i > 10) {
+					if (best_score < 0.1)
+						break;
+				}
+			}
 			
 			cout << "Adding EQ: ";
 			for (size_t i = 0; i < eq.size(); i++) {
@@ -295,6 +249,8 @@ namespace nac {
 				cout << eq.at(i) << " ";
 			}
 			cout << endl;
+			
+			cout << endl;
 		}
 		
 		return best_eq;
@@ -302,7 +258,6 @@ namespace nac {
 	
 	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db, const vector<int>& ignore_bands) {
 		auto& eq_frequencies = eq_settings.first;
-		//auto& q = eq_settings.second;
 		
 		// TODO: Make this more generic by input band size in octaves, e.g. 1/3 octaves and so on
 		// Calculate band limits
@@ -315,9 +270,6 @@ namespace nac {
 			
 			band_limits.push_back(lower);
 			band_limits.push_back(upper);
-			
-			//cout << "Added band limit " << lower << endl;
-			//cout << "Added band limit " << upper << endl;
 		}
 		
 		vector<double> energy(eq_frequencies.size(), 0);
@@ -325,8 +277,8 @@ namespace nac {
 		
 		FFTOutput actual = input;
 		
-		if (!input_db)
-			actual = nac::toDecibel(actual);
+		if (input_db)
+			cout << "Warning: dB input not supported\n";
 			
 		auto& frequencies = actual.first;
 		auto& dbs = actual.second;
@@ -346,12 +298,15 @@ namespace nac {
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
 		
 		for (size_t i = 0; i < num.size(); i++) {
-			// Divice with number of frequencies in the band for white noise
-			energy.at(i) /= num.at(i);
+			// Divide with the octave width
+			auto low = band_limits.at(i * 2);
+			auto high = band_limits.at(i * 2 + 1);
 			
+			energy.at(i) /= (high - low);
+				
 			// Convert to dB
-			//if (!input_db)
-			//	energy.at(i) = 10 * log10(energy.at(i));
+			if (!input_db)
+				energy.at(i) = 10 * log10(energy.at(i));
 			
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
 		}
