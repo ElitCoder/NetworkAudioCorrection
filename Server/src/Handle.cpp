@@ -127,7 +127,7 @@ void resetEverything(const vector<string>& ips) {
 static void setTestSpeakerSettings(const vector<string>& ips) {
 	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 2; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
@@ -808,7 +808,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static void showCalibrationScore(const vector<string>& mic_ips, bool after) {
+static void showCalibrationScore(const vector<string>& mic_ips) {
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -834,8 +834,20 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool after) {
 		auto fft_output = nac::doFFT(sound);
 		auto applied = fft_output;
 		
-		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+		vector<int> ignore;
+
+		if (Base::config().get<bool>("enable_hardware_profile")) {
+			auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
+			
+			if (index > 0) {
+				while (index > 0)
+					ignore.push_back(--index);
+			}
+		}
 		
+		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
+		
+		#if 0
 		if (Base::config().get<bool>("enable_hardware_profile") && after) {
 			auto in_db = nac::toDecibel(fft_output);
 			
@@ -858,6 +870,7 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool after) {
 			
 			nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
 		}
+		#endif
 	}
 }
 
@@ -1171,7 +1184,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		//g_target_mean = flat_level_db;
 		
 		// See calibration score before calibrating
-		showCalibrationScore(mic_ips, false);
+		showCalibrationScore(mic_ips);
 		
 		timestamp = writeWhiteNoiseFiles("before");
 	}
@@ -1221,7 +1234,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				auto response = getWhiteResponse(data, sound_start, sound_stop);
 				//response = nac::toDecibel(response);
 				
-				dbs = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+				dbs = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
 				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
 				
 				// Calculate speaker EQ
@@ -1234,7 +1247,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 					cout << endl;
 				} else {
 					cout << "Transformed to:\n";
-					auto negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+					auto negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
 					
 					if (Base::config().get<bool>("enable_hardware_profile")) {
 						response = nac::toDecibel(response);
@@ -1253,7 +1266,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 						response = nac::toLinear(response);
 						
 						cout << "After hardware profile:\n";
-						negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+						negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
 					}
 					
 					// Negative response to get change curve
@@ -1362,7 +1375,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		Base::system().getRecordings(mic_ips);
 		
 		// See calibration score before calibrating
-		showCalibrationScore(mic_ips, true);
+		showCalibrationScore(mic_ips);
 		
 		writeWhiteNoiseFiles("after", timestamp);
 		writeEQSettings("after", timestamp, speaker_ips);
@@ -1423,7 +1436,7 @@ static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 	
 	auto before = nac::doFFT(real);
 	//before = nac::toDecibel(before);
-	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
 	
 	for (size_t i = 0; i < g_last_eq.size(); i++)
 		cout << eq.at(i) - g_last_eq.at(i) << " ";

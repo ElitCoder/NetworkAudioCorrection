@@ -197,7 +197,7 @@ namespace nac {
 	}
 	
 	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
-		return fitBands(input, eq_settings, false);
+		return fitBands(input, eq_settings, false).first;
 	}
 	
 	vector<double> findSimulatedEQSettings(const vector<short>& samples, FilterBank& filter, size_t start, size_t stop) {
@@ -232,7 +232,7 @@ namespace nac {
 			auto applied = response;
 			
 			cout << "Transformed to:\n";
-			auto negative_curve = nac::fitBands(applied, speaker_eq, false);
+			auto peer = nac::fitBands(applied, speaker_eq, false);
 			
 			if (Base::config().get<bool>("enable_hardware_profile")) {
 				applied = nac::toDecibel(applied);
@@ -250,17 +250,26 @@ namespace nac {
 				// Revert back to energy
 				applied = nac::toLinear(applied);
 				
+				vector<int> ignore;
+				auto index = speaker_profile.getFrequencyIndex(speaker_profile.getLowCutOff());
+				
+				if (index > 0) {
+					while (index > 0)
+						ignore.push_back(--index);
+				}
+				
 				cout << "After hardware profile:\n";
-				negative_curve = nac::fitBands(applied, speaker_eq, false);
+				peer = nac::fitBands(applied, speaker_eq, false, ignore);
 			}
+			
+			auto negative_curve = peer.first;
+			auto db_std_dev = peer.second;
 
 			// Negative response to get change curve
 			vector<double> eq;
 			
 			for (auto& value : negative_curve)
 				eq.push_back(value * (-1));
-			
-			auto db_std_dev = calculateSD(negative_curve);
 			
 			if (db_std_dev < best_score) {
 				best_score = db_std_dev;
@@ -270,12 +279,14 @@ namespace nac {
 			if (db_std_dev < 0.1 && best_eq.size() > 0)
 				break;
 			
-			if (abs(db_std_dev - last_dev) < 0.005 && best_eq.size() > 0 && i > 10)
+			if (abs(db_std_dev - last_dev) < 0.01 && best_eq.size() > 0 && i > 10)
 				break;
 				
 			last_dev = db_std_dev;
 			
-			correctMaxEQ(eq);
+			//correctMaxEQ(eq);
+			//eq.front() = eq.at(1) / 2;
+			//correctMaxEQ(eq);
 			
 			cout << "Adding EQ: ";
 			for (size_t i = 0; i < eq.size(); i++) {
@@ -289,7 +300,7 @@ namespace nac {
 		return best_eq;
 	}
 	
-	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
+	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db, const vector<int>& ignore_bands) {
 		auto& eq_frequencies = eq_settings.first;
 		//auto& q = eq_settings.second;
 		
@@ -340,9 +351,23 @@ namespace nac {
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
 		}
 		
+		vector<double> left;
+		
+		for (size_t i = 0; i < energy.size(); i++)
+			if (find(ignore_bands.begin(), ignore_bands.end(), i) == ignore_bands.end())
+				left.push_back(energy.at(i));
+		
 		auto db_std_dev = calculateSD(energy);
 		cout << "db_std_dev " << db_std_dev << endl;
 		
-		return energy;
+		if (!ignore_bands.empty()) {
+			db_std_dev = calculateSD(left);
+			cout << "db_std_dev " << db_std_dev << " excluding band ";
+			for (auto& band : ignore_bands)
+				cout << band << " ";
+			cout << endl;
+		}
+		
+		return { energy, db_std_dev };
 	}
 }
