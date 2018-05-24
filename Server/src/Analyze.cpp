@@ -210,7 +210,7 @@ namespace nac {
 		
 		double last_dev = 0;
 		
-		for (int i = 0; i < 80; i++) {
+		for (int i = 0; i < 100; i++) {
 			correctMaxEQ(eq_change);
 			
 			vector<pair<int, double>> gains;
@@ -270,7 +270,7 @@ namespace nac {
 			if (db_std_dev < 0.1 && best_eq.size() > 0)
 				break;
 			
-			if (abs(db_std_dev - last_dev) < 0.005 && best_eq.size() > 0)
+			if (abs(db_std_dev - last_dev) < 0.005 && best_eq.size() > 0 && i > 10)
 				break;
 				
 			last_dev = db_std_dev;

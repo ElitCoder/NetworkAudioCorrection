@@ -35,7 +35,7 @@ enable_hardware_profile: 1
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -24
 hardware_profile_steep_high: 0
-hardware_profile_cutoff_low: 80
+hardware_profile_cutoff_low: 100
 hardware_profile_cutoff_high: 17000
 # Which level the DSP will set when testing white noise
 calibration_safe_gain: -12
