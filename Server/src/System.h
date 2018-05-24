@@ -27,6 +27,8 @@ public:
 	void setMicrophoneProfile(const Profile& profile);
 	
 	const Profile& getSpeakerProfile() const;
+	Profile& getSpeakerProfile();
+	
 	const Profile& getMicrophoneProfile() const;
 	
 private:

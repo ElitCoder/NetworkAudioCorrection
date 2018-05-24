@@ -9,7 +9,7 @@
 #include "System.h"
 #include "Config.h"
 #include "Analyze.h"
-#include "Filter.h"
+#include "FilterBank.h"
 
 #include <iostream>
 #include <cmath>
@@ -830,12 +830,15 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool after) {
 		
 		cout << mic_ip << " sound level " << sound_level << " dB\n";
 		
-		auto fft_output = nac::toDecibel(nac::doFFT(sound));
+		//auto fft_output = nac::toDecibel(nac::doFFT(sound));
+		auto fft_output = nac::doFFT(sound);
 		auto applied = fft_output;
 		
-		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
 		
 		if (Base::config().get<bool>("enable_hardware_profile") && after) {
+			auto in_db = nac::toDecibel(fft_output);
+			
 			// Invert the speaker profile to compare with the after curve since we made it less prone to edit the lower & higher frequencies and that's what we wanted.
 			// Hence it should produce a higher score
 			cout << "When enabling hardware profile:\n";
@@ -848,8 +851,12 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool after) {
 				mic_profile = Base::system().getMicrophoneProfile();
 			}
 			
-			applied = nac::applyProfiles(fft_output, speaker_profile, mic_profile);
-			nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), true);
+			applied = nac::applyProfiles(in_db, speaker_profile, mic_profile);
+			
+			// Revert back to energy
+			applied = nac::toLinear(applied);
+			
+			nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
 		}
 	}
 }
@@ -1211,6 +1218,54 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			vector<double> final_eq;
 			
 			if (run_white_noise) {
+				auto response = getWhiteResponse(data, sound_start, sound_stop);
+				//response = nac::toDecibel(response);
+				
+				dbs = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
+				
+				// Calculate speaker EQ
+				if (Base::config().get<bool>("simulate_eq_settings")) {
+					final_eq = nac::findSimulatedEQSettings(data, Base::system().getSpeakerProfile().getFilter(), sound_start, sound_stop);
+					
+					cout << "Returned final_eq: ";
+					for (auto& setting : final_eq)
+						cout << setting << " ";
+					cout << endl;
+				} else {
+					cout << "Transformed to:\n";
+					auto negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+					
+					if (Base::config().get<bool>("enable_hardware_profile")) {
+						response = nac::toDecibel(response);
+						
+						auto speaker_profile = Base::system().getSpeakerProfile().invert();
+						auto mic_profile = Base::system().getMicrophoneProfile().invert();
+						
+						if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
+							speaker_profile = Base::system().getSpeakerProfile();
+							mic_profile = Base::system().getMicrophoneProfile();
+						}
+						
+						response = nac::applyProfiles(response, speaker_profile, mic_profile);
+						
+						// Revert back to energy
+						response = nac::toLinear(response);
+						
+						cout << "After hardware profile:\n";
+						negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+					}
+					
+					// Negative response to get change curve
+					vector<double> change_eq;
+					
+					for (auto& value : negative_curve)
+						change_eq.push_back(value * (-1));
+					
+					final_eq = change_eq;
+				}
+				
+				#if 0
 				auto eq_settings = Base::system().getSpeakerProfile().getSpeakerEQ();
 				
 				auto response = getWhiteResponse(data, sound_start, sound_stop);
@@ -1237,6 +1292,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 				dbs = fit_response;
 				
 				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
+				#endif
 			} else {
 				// Calculate FFT for 9 band as well
 				auto db_linears = getFFT9(data, sound_start, sound_stop);
@@ -1386,7 +1442,14 @@ static vector<short> plotFFTFile(const string& file) {
 }
 
 void Handle::testing() {
+	return;
+	
 	try {
+		auto before = plotFFTFile("before.wav");
+		auto final_eq = nac::findSimulatedEQSettings(before, Base::system().getSpeakerProfile().getFilter(), 2 * 48000, 30 * 48000);
+		
+		return;
+		
 		ifstream file("eqs");
 		
 		// Ignore number
@@ -1417,7 +1480,7 @@ void Handle::testing() {
 		auto before_samples = plotFFTFile("before.wav");
 		
 		vector<short> simulated_samples;
-		filter.apply(before_samples, simulated_samples, eq, 48000, 2 * 48000, 30 * 48000);
+		filter.apply(before_samples, simulated_samples, eq, 48000);
 		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
 		
 		WavReader::write("after.wav", simulated_samples, "real_after.wav");

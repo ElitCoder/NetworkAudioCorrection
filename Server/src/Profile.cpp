@@ -73,3 +73,7 @@ int Profile::getFrequencyIndex(int frequency) const {
 			
 	return -1;
 }
+
+FilterBank& Profile::getFilter() {
+	return filter_;
+}

@@ -1,6 +1,6 @@
 #pragma once
-#ifndef FILTER_H
-#define FILTER_H
+#ifndef FILTER_BANK_H
+#define FILTER_BANK_H
 
 #include <vector>
 #include <cstddef>
@@ -8,7 +8,7 @@
 class FilterBank {
 public:
 	void addBand(int frequency, double q);
-	void apply(const std::vector<short>& samples, std::vector<short>& out, const std::vector<std::pair<int, double>>& gains, int fs, size_t start = 0, size_t stop = 0);
+	void apply(const std::vector<short>& samples, std::vector<short>& out, const std::vector<std::pair<int, double>>& gains, int fs);
 
 private:
 	class Filter {

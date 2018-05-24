@@ -204,6 +204,10 @@ const Profile& System::getSpeakerProfile() const {
 	return speaker_profile_;
 }
 
+Profile& System::getSpeakerProfile() {
+	return speaker_profile_;
+}
+
 const Profile& System::getMicrophoneProfile() const {
 	return microphone_profile_;
 }

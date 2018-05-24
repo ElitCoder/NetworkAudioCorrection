@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 
 // libcurlpp
 #include <curlpp/cURLpp.hpp>
@@ -139,23 +140,6 @@ static void handle(Connection& connection, Packet& input_packet) {
 			cout << "Warning: not implemented!\n";
 			
 			break;
-			
-			#if 0
-			vector<string> speakers;
-			vector<string> mics;
-			int num_speakers = input_packet.getInt();
-			int num_mics = input_packet.getInt();
-			
-			for (int i = 0; i < num_speakers; i++)
-				speakers.push_back(input_packet.getString());
-				
-			for (int i = 0; i < num_mics; i++)
-				mics.push_back(input_packet.getString());	
-				
-			Handle::setBestEQ(speakers, mics);
-			
-			break;
-			#endif
 		}
 		
 		case PACKET_SET_EQ_STATUS: {
@@ -245,6 +229,9 @@ int main() {
 	speaker.setSpeakerEQ(frequencies, q);
 	speaker.setMaxEQ(Base::config().get<double>("dsp_eq_max"));
 	speaker.setMinEQ(Base::config().get<double>("dsp_eq_min"));
+	
+	for (size_t i = 0; i < frequencies.size(); i++)
+		speaker.getFilter().addBand(lround(frequencies.at(i)), q);
 	
 	Base::system().setSpeakerProfile(speaker);
 	Base::system().setMicrophoneProfile(microphone);

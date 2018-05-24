@@ -2,6 +2,8 @@
 #ifndef NAC_PROFILE_H
 #define NAC_PROFILE_H
 
+#include "FilterBank.h"
+
 #include <vector>
 
 // Just keep cut-off frequencies for now
@@ -30,6 +32,8 @@ public:
 	
 	int getFrequencyIndex(int frequency) const;
 	
+	FilterBank& getFilter();
+	
 private:
 	std::vector<double> eq_frequencies_;
 	double eq_q_		= 1;
@@ -43,5 +47,7 @@ private:
 	
 	double dsp_max_eq_	= 0;
 	double dsp_min_eq_	= 0;
+	
+	FilterBank filter_;
 };
 #endif

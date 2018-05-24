@@ -5,6 +5,7 @@
 // TODO: Remove this dependency
 #include "Base.h"
 #include "System.h"
+#include "Config.h"
 
 // SigPack
 #include <sigpack/sigpack.h>
@@ -47,6 +48,30 @@ static int getBandIndex(double frequency, const vector<double>& limits) {
 	}
 	
 	return -1;
+}
+
+static double correctMaxEQ(vector<double>& eq) {
+	double total_mean_change = 0;
+	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
+	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
+	
+	for (int i = 0; i < 1000; i++) {
+		double mean_db = mean(eq);
+		
+		for (auto& setting : eq)
+			setting -= mean_db;
+				
+		for (auto& setting : eq) {
+			if (setting < min_eq)
+				setting = min_eq;
+			else if (setting > max_eq)
+				setting = max_eq;
+		}
+		
+		total_mean_change += mean_db;
+	}
+	
+	return total_mean_change;
 }
 
 #if 0
@@ -161,12 +186,107 @@ namespace nac {
 		return output;	
 	}
 	
+	FFTOutput toLinear(const FFTOutput& input) {
+		FFTOutput output = input;
+		auto& dbs = output.second;
+		
+		for (auto& db : dbs)
+			db = pow(10, db / 10);
+			
+		return output;	
+	}
+	
 	vector<double> getEQ(const FFTOutput& input, const pair<vector<double>, double>& eq_settings) {
 		return fitBands(input, eq_settings, false);
 	}
 	
-	vector<double> findSimulatedEQSettings(const vector<short>& samples, const Filter& filter) {
-		return vector<double>();
+	vector<double> findSimulatedEQSettings(const vector<short>& samples, FilterBank& filter, size_t start, size_t stop) {
+		auto speaker_eq = Base::system().getSpeakerProfile().getSpeakerEQ();
+		auto& speaker_eq_frequencies = speaker_eq.first;
+		
+		vector<double> eq_change(speaker_eq_frequencies.size(), 0);
+		vector<double> best_eq;
+		double best_score = INT_MAX;
+		
+		double last_dev = 0;
+		
+		for (int i = 0; i < 80; i++) {
+			correctMaxEQ(eq_change);
+			
+			vector<pair<int, double>> gains;
+			
+			cout << "Trying EQ: ";
+			for (size_t i = 0; i < speaker_eq_frequencies.size(); i++) {
+				gains.push_back({ speaker_eq_frequencies.at(i), eq_change.at(i) });
+				
+				cout << eq_change.at(i) << " ";
+			}
+			cout << endl;
+			
+			vector<short> simulated_samples;
+			filter.apply(samples, simulated_samples, gains, 48000);
+			
+			// Find basic EQ change
+			vector<short> scaled_samples(simulated_samples.begin() + start, simulated_samples.begin() + stop);
+			auto response = nac::doFFT(scaled_samples);
+			auto applied = response;
+			
+			cout << "Transformed to:\n";
+			auto negative_curve = nac::fitBands(applied, speaker_eq, false);
+			
+			if (Base::config().get<bool>("enable_hardware_profile")) {
+				applied = nac::toDecibel(applied);
+				
+				auto speaker_profile = Base::system().getSpeakerProfile().invert();
+				auto mic_profile = Base::system().getMicrophoneProfile().invert();
+				
+				if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
+					speaker_profile = Base::system().getSpeakerProfile();
+					mic_profile = Base::system().getMicrophoneProfile();
+				}
+				
+				applied = nac::applyProfiles(applied, speaker_profile, mic_profile);
+				
+				// Revert back to energy
+				applied = nac::toLinear(applied);
+				
+				cout << "After hardware profile:\n";
+				negative_curve = nac::fitBands(applied, speaker_eq, false);
+			}
+
+			// Negative response to get change curve
+			vector<double> eq;
+			
+			for (auto& value : negative_curve)
+				eq.push_back(value * (-1));
+			
+			auto db_std_dev = calculateSD(negative_curve);
+			
+			if (db_std_dev < best_score) {
+				best_score = db_std_dev;
+				best_eq = eq_change;
+			}
+			
+			if (db_std_dev < 0.1 && best_eq.size() > 0)
+				break;
+			
+			if (abs(db_std_dev - last_dev) < 0.005 && best_eq.size() > 0)
+				break;
+				
+			last_dev = db_std_dev;
+			
+			correctMaxEQ(eq);
+			
+			cout << "Adding EQ: ";
+			for (size_t i = 0; i < eq.size(); i++) {
+				eq_change.at(i) += eq.at(i);
+				
+				cout << eq.at(i) << " ";
+			}
+			cout << endl;
+		}
+		
+		return best_eq;
 	}
 	
 	vector<double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
@@ -210,6 +330,7 @@ namespace nac {
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
 		
 		for (size_t i = 0; i < num.size(); i++) {
+			// Divice with number of frequencies in the band for white noise
 			energy.at(i) /= num.at(i);
 			
 			// Convert to dB
