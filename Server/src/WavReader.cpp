@@ -12,7 +12,7 @@ void WavReader::read(const string &filename, vector<short>& output) {
 	if (!file.is_open()) {
 		cout << "Error: could not open file " << filename << endl;
 		
-		return;
+		throw exception();
 	} else
 	
 	cout << "Opened WAV " << filename << " for reading\n";
@@ -40,7 +40,7 @@ void WavReader::write(const string& filename, const vector<short>& input, const 
 	if (!file.is_open()) {
 		cout << "Error: could not open file " << filename << endl;
 		
-		return;
+		throw exception();
 	}
 	
 	cout << "Opened WAV " << filename << " for writing\n";
@@ -55,7 +55,7 @@ void WavReader::write(const string& filename, const vector<short>& input, const 
 		if (!header_file.is_open()) {
 			cout << "Error: could not open file " << copy_header << endl;
 			
-			return;
+			throw exception();
 		}
 		
 		header_file.read((char*)&header, sizeof(WavHeader));
@@ -65,7 +65,7 @@ void WavReader::write(const string& filename, const vector<short>& input, const 
 	} else {
 		cout << "Warning: not reading header from another WAV is not supported right now\n";
 		
-		return;
+		throw exception();
 	}
 	
 	// Write header

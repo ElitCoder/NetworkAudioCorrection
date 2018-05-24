@@ -3,6 +3,7 @@
 #define FILTER_H
 
 #include <vector>
+#include <cstddef>
 
 class FilterBank {
 public:

@@ -1386,44 +1386,48 @@ static vector<short> plotFFTFile(const string& file) {
 }
 
 void Handle::testing() {
-	ifstream file("eqs");
-	
-	// Ignore number
-	double tmp;
-	file >> tmp;
-	
-	vector<pair<int, double>> eq;
-	
-	for (int i = 0; i < 9; i++) {
+	try {
+		ifstream file("eqs");
+		
+		// Ignore number
+		double tmp;
 		file >> tmp;
 		
-		eq.push_back({ stoi(g_frequencies.at(i)), tmp });
-	}
-	
-	file.close();
-	
-	//for (auto& setting : eq)
-	//	setting.second = 3;
-	
-	FilterBank filter;
-	
-	for (auto& frequency : g_frequencies)
-		filter.addBand(stoi(frequency), 1);
-	
-	//filter.addBand(125, 2);
-	//filter.addBand(4000, 2);
+		vector<pair<int, double>> eq;
+		
+		for (int i = 0; i < 9; i++) {
+			file >> tmp;
 			
-	auto before_samples = plotFFTFile("before.wav");
-	
-	vector<short> simulated_samples;
-	filter.apply(before_samples, simulated_samples, eq, 48000, 2 * 48000, 30 * 48000);
-	plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
-	
-	WavReader::write("after.wav", simulated_samples, "real_after.wav");
-	
-	auto after_samples = plotFFTFile("real_after.wav");
-	
-	for (auto& setting : eq)
-		cout << setting.second << " ";
-	cout << endl;
+			eq.push_back({ stoi(g_frequencies.at(i)), tmp });
+		}
+		
+		file.close();
+		
+		//for (auto& setting : eq)
+		//	setting.second = 3;
+		
+		FilterBank filter;
+		
+		for (auto& frequency : g_frequencies)
+			filter.addBand(stoi(frequency), 1);
+		
+		//filter.addBand(125, 2);
+		//filter.addBand(4000, 2);
+
+		auto before_samples = plotFFTFile("before.wav");
+		
+		vector<short> simulated_samples;
+		filter.apply(before_samples, simulated_samples, eq, 48000, 2 * 48000, 30 * 48000);
+		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
+		
+		WavReader::write("after.wav", simulated_samples, "real_after.wav");
+		
+		auto after_samples = plotFFTFile("real_after.wav");
+		
+		for (auto& setting : eq)
+			cout << setting.second << " ";
+		cout << endl;
+	} catch (...) {
+		cout << "Testing failed, don't care\n";
+	}
 }
