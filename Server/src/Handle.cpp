@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <climits>
 #include <fstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -1451,11 +1452,12 @@ static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 	g_last_eq = eq;
 }
 
-static vector<short> plotFFTFile(const string& file) {
+static vector<short> plotFFTFile(const string& file, size_t start, size_t stop, bool plot = true) {
 	vector<short> samples;
 	WavReader::read(file, samples);
 	
-	plotFFT(samples, 2 * 48000, 30 * 48000);
+	if (plot)
+		plotFFT(samples, start, stop);
 	
 	return samples;
 }
@@ -1478,42 +1480,53 @@ void Handle::testing() {
 		
 		file.close();
 		
-		FilterBank filter;
-		
-		for (auto& frequency : g_frequencies)
-			filter.addBand(stoi(frequency), 1);
+		size_t start = lround(1.5 * 48000.0);
+		size_t stop = lround(3.5 * 48000.0);
+		bool calc_eq = false;
 
-		auto before_samples = plotFFTFile("before.wav");
+		auto before_samples = plotFFTFile("before.wav", start, stop, false);
+		auto after_samples = plotFFTFile("after.wav", start, stop, false);
 		
-		vector<short> simulated_samples;
-		filter.apply(before_samples, simulated_samples, eq, 48000);
-		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
+		vector<double> final_eq;
 		
-		auto after_samples = plotFFTFile("after.wav");
+		if (calc_eq)
+			final_eq = nac::findSimulatedEQSettings(before_samples, Base::system().getSpeakerProfile().getFilter(), start, stop);
 		
-		#if 0
-		auto final_eq = nac::findSimulatedEQSettings(before_samples, filter, 2 * 48000, 30 * 48000);
-		
-		cout << "Simulated EQ: ";
-		for (auto& setting : final_eq)
-			cout << setting << " ";
+		cout << endl << endl;
+			
+		cout << "Before:\n";
+		plotFFT(before_samples, start, stop);
 		cout << endl;
-		#endif
 		
-		cout << "Actual EQ: ";
+		cout << "After:\n";
+		plotFFT(after_samples, start, stop);
+		cout << endl;
+		
+		cout << "Simulated:\n";
+		vector<short> simulated_samples;
+		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, eq, 48000);
+		plotFFT(simulated_samples, start, stop);
+		cout << endl;
+		
+		cout << "Actual EQ:\t";
 		for (auto& setting : eq)
 			cout << setting.second << " ";
 		cout << endl;
-		
-		#if 0
-		for (size_t i = 0; i < eq.size(); i++)
-			eq.at(i).second = final_eq.at(i);
+
+		if (calc_eq) {
+			for (size_t i = 0; i < eq.size(); i++)
+				eq.at(i).second = final_eq.at(i);
+				
+			cout << "Simulated EQ:\t";
+			for (auto& setting : final_eq)
+				cout << setting << " ";
+			cout << endl;
+			cout << endl;
 			
-		filter.apply(before_samples, simulated_samples, eq, 48000);
-		plotFFT(simulated_samples, 2 * 48000, 30 * 48000);
+			WavReader::write("simulated_after.wav", simulated_samples, "after.wav");
+		}
 		
-		WavReader::write("simulated_after.wav", simulated_samples, "after.wav");
-		#endif
+		cout << endl;
 	} catch (...) {
 		cout << "Testing failed, don't care\n";
 	}

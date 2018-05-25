@@ -35,7 +35,7 @@ customer_profile: 6 0 2 -2 -1 -1 -2 3 6
 enable_hardware_profile: 0
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -24
-hardware_profile_steep_high: 0
+hardware_profile_steep_high: -24
 hardware_profile_cutoff_low: 100
 hardware_profile_cutoff_high: 17000
 # Which level the DSP will set when testing white noise
