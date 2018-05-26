@@ -16,6 +16,8 @@ play_time_freq: 3
 play_time_localization: 1
 validate_white_noise: 1
 enable_testing: 0
+# Should we divide with bandwidth?
+is_white_noise: 1
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -32,14 +34,14 @@ dsp_eq_max: 12
 dsp_eq_min: -12
 enable_customer_profile: 1
 customer_profile: 6 0 2 -2 -1 -1 -2 3 6
-enable_hardware_profile: 0
+enable_hardware_profile: 1
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -24
 hardware_profile_steep_high: -24
 hardware_profile_cutoff_low: 100
 hardware_profile_cutoff_high: 17000
 # Which level the DSP will set when testing white noise
-calibration_safe_gain: -12
+calibration_safe_gain: -3
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
 safe_dsp_max: 800
 enable_sound_level_adjustment: 0

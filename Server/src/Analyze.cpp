@@ -298,11 +298,13 @@ namespace nac {
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
 		
 		for (size_t i = 0; i < num.size(); i++) {
-			// Divide with the octave width
-			auto low = band_limits.at(i * 2);
-			auto high = band_limits.at(i * 2 + 1);
-			
-			energy.at(i) /= (high - low);
+			if (Base::config().get<bool>("is_white_noise")) {
+				// Divide with the octave width
+				auto low = band_limits.at(i * 2);
+				auto high = band_limits.at(i * 2 + 1);
+				
+				energy.at(i) /= (high - low);
+			}
 				
 			// Convert to dB
 			if (!input_db)
