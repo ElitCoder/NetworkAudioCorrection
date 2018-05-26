@@ -15,7 +15,7 @@ cd curlpp/ && mkdir build/ && cd build/ && cmake .. && make -j $cores && sudo ma
 
 # install libnessh
 git clone https://github.com/ElitCoder/nessh.git
-cd nessh/ && ./install.sh && cd ../
+cd nessh/ && ./install_apt.sh && cd ../
 
 # install sigpack
 sudo cp -r dependencies/sigpack/ /usr/include/
