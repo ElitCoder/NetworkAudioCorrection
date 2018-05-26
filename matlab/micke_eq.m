@@ -71,7 +71,7 @@ grid on
 
 x0=100;
 y0=200;
-width=1920;
-height=300;
+width=1366;
+height=200;
 
 set(gcf,'units','points','position',[x0,y0,width,height])
