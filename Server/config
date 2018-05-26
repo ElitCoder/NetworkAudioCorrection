@@ -30,9 +30,9 @@ timeout: 120
 # Sound settings
 dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
 dsp_eq_q: 1
-dsp_eq_max: 36
-dsp_eq_min: -36
-enable_customer_profile: 0
+dsp_eq_max: 12
+dsp_eq_min: -12
+enable_customer_profile: 1
 customer_profile: 4 2 -1 -2 -1 -1 -2 3 6
 enable_hardware_profile: 1
 hardware_profile_boost_steeps: 0
@@ -47,4 +47,4 @@ safe_dsp_max: 800
 enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
-max_simulation_iterations: 20
+max_simulation_iterations: 30

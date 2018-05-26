@@ -253,6 +253,21 @@ namespace nac {
 				}
 			}
 			
+			auto eq_mean = mean(eq);
+			
+			for (size_t i = 0; i < eq.size(); i++)
+				eq.at(i) -= eq_mean;
+				
+			for (size_t i = 0; i < eq_change.size(); i++) {
+				if (eq.at(i) >= 0) {
+					if (eq_change.at(i) >= (Base::system().getSpeakerProfile().getMaxEQ() - 0.5))
+						eq.at(i) = 0;
+				} else {
+					if (eq_change.at(i) <= (Base::system().getSpeakerProfile().getMinEQ() + 0.5))
+						eq.at(i) = 0;
+				}
+			}
+			
 			cout << "Adding EQ: ";
 			for (size_t i = 0; i < eq.size(); i++) {
 				eq_change.at(i) += eq.at(i);
