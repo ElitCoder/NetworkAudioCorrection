@@ -29,6 +29,14 @@ bool Speaker::isOnline() const {
 	return online_;
 }
 
+void Speaker::setSD(const pair<double, double>& sds) {
+	sds_ = sds;
+}
+
+const pair<double, double>& Speaker::getSD() const {
+	return sds_;
+}
+
 void Speaker::setPlacement(const SpeakerPlacement& placement, int placement_id) {
 	placement_ = placement;
 	last_placement_id_ = placement_id;

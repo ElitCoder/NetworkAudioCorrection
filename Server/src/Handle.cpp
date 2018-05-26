@@ -809,7 +809,7 @@ static void runTestSoundImage(const vector<string>& speaker_ips, const vector<st
 	Base::system().runScript(all_ips, scripts);
 }
 
-static void showCalibrationScore(const vector<string>& mic_ips) {
+static void showCalibrationScore(const vector<string>& mic_ips, bool only_rms) {
 	for (auto& mic_ip : mic_ips) {
 		string filename = "results/cap" + mic_ip + ".wav";
 		
@@ -831,47 +831,26 @@ static void showCalibrationScore(const vector<string>& mic_ips) {
 		
 		cout << mic_ip << " sound level " << sound_level << " dB\n";
 		
-		//auto fft_output = nac::toDecibel(nac::doFFT(sound));
-		auto fft_output = nac::doFFT(sound);
-		auto applied = fft_output;
-		
-		vector<int> ignore;
+		if (!only_rms) {
+			//auto fft_output = nac::toDecibel(nac::doFFT(sound));
+			auto fft_output = nac::doFFT(sound);
+			auto applied = fft_output;
+			
+			vector<int> ignore;
 
-		if (Base::config().get<bool>("enable_hardware_profile")) {
-			auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
-			
-			if (index > 0) {
-				while (index > 0)
-					ignore.push_back(--index);
-			}
-		}
-		
-		nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
-		
-		#if 0
-		if (Base::config().get<bool>("enable_hardware_profile") && after) {
-			auto in_db = nac::toDecibel(fft_output);
-			
-			// Invert the speaker profile to compare with the after curve since we made it less prone to edit the lower & higher frequencies and that's what we wanted.
-			// Hence it should produce a higher score
-			cout << "When enabling hardware profile:\n";
-			
-			auto speaker_profile = Base::system().getSpeakerProfile().invert();
-			auto mic_profile = Base::system().getMicrophoneProfile().invert();
-			
-			if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-				speaker_profile = Base::system().getSpeakerProfile();
-				mic_profile = Base::system().getMicrophoneProfile();
+			if (Base::config().get<bool>("enable_hardware_profile")) {
+				auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
+				
+				if (index > 0) {
+					while (index > 0)
+						ignore.push_back(--index);
+				}
 			}
 			
-			applied = nac::applyProfiles(in_db, speaker_profile, mic_profile);
+			auto peer = nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
 			
-			// Revert back to energy
-			applied = nac::toLinear(applied);
-			
-			nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false);
+			Base::system().getSpeaker(mic_ip).setSD(peer.second);
 		}
-		#endif
 	}
 }
 
@@ -1185,7 +1164,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		//g_target_mean = flat_level_db;
 		
 		// See calibration score before calibrating
-		showCalibrationScore(mic_ips);
+		showCalibrationScore(mic_ips, false);
 		
 		timestamp = writeWhiteNoiseFiles("before");
 	}
@@ -1214,7 +1193,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	MicWantedEQ wanted_eqs(mic_ips.size());
 	
 	// Go through frequency analysis
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for (size_t z = 0; z < mic_ips.size(); z++) {
 		auto& mic_ip = mic_ips.at(z);
 		string filename = "results/cap" + mic_ip + ".wav";
@@ -1373,20 +1352,28 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	
 	setEQ(speaker_ips, TYPE_BEST_EQ);
 	
-	if (Base::config().get<bool>("enable_sound_level_adjustment"))
-		setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain, false);
-	
 	if (run_validation) {
 		// Play white noise from all speakers to check sound image & collect the recordings
 		runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 		Base::system().getRecordings(mic_ips);
 		
 		// See calibration score before calibrating
-		showCalibrationScore(mic_ips);
+		showCalibrationScore(mic_ips, false);
 		
 		writeWhiteNoiseFiles("after", timestamp);
 		writeEQSettings("after", timestamp, speaker_ips);
 		moveToMATLAB(timestamp, mic_ips);
+	}
+	
+	if (Base::config().get<bool>("enable_sound_level_adjustment")) {
+		setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain, false);
+		
+		if (run_validation) {
+			runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
+			Base::system().getRecordings(mic_ips);
+			
+			showCalibrationScore(mic_ips, true);
+		}
 	}
 	
 	if (Base::config().get<bool>("enable_customer_profile")) {

@@ -217,12 +217,23 @@ namespace nac {
 				// Revert back to energy
 				response = nac::toLinear(response);
 				
+				vector<int> ignore;
+
+				if (Base::config().get<bool>("enable_hardware_profile")) {
+					auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
+					
+					if (index > 0) {
+						while (index > 0)
+							ignore.push_back(--index);
+					}
+				}
+				
 				cout << "After hardware profile:\n";
-				peer = nac::fitBands(response, speaker_eq, false);
+				peer = nac::fitBands(response, speaker_eq, false, ignore);
 			}
 			
 			auto& negative_curve = peer.first;
-			auto& db_std_dev = peer.second;
+			auto& db_std_dev = peer.second.second;
 
 			// Negative response to get change curve
 			vector<double> eq;
@@ -256,7 +267,7 @@ namespace nac {
 		return best_eq;
 	}
 	
-	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db, const vector<int>& ignore_bands) {
+	pair<vector<double>, pair<double, double>> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db, const vector<int>& ignore_bands) {
 		auto& eq_frequencies = eq_settings.first;
 		
 		// TODO: Make this more generic by input band size in octaves, e.g. 1/3 octaves and so on
@@ -321,15 +332,16 @@ namespace nac {
 		
 		auto db_std_dev = calculateSD(energy);
 		cout << "db_std_dev " << db_std_dev << endl;
+		auto db_std_dev_ignore = db_std_dev;
 		
 		if (!ignore_bands.empty()) {
-			db_std_dev = calculateSD(left);
-			cout << "db_std_dev " << db_std_dev << " excluding band ";
+			db_std_dev_ignore = calculateSD(left);
+			cout << "db_std_dev " << db_std_dev_ignore << " excluding band ";
 			for (auto& band : ignore_bands)
 				cout << band << " ";
 			cout << endl;
 		}
 		
-		return { energy, db_std_dev };
+		return { energy, { db_std_dev, db_std_dev_ignore } };
 	}
 }

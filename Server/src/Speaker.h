@@ -42,6 +42,7 @@ public:
 	void setOnline(bool status);
 	void setdBType(int type);
 	void setDSPGain(double gain);
+	void setSD(const std::pair<double, double>& sds);
 	
 	// EQ setters
 	void clearAllEQs();
@@ -63,6 +64,7 @@ public:
 	double getVolume() const;
 	bool isOnline() const;
 	double getdBType() const;
+	const std::pair<double, double>& getSD() const;
 	
 	// EQ getters
 	std::vector<double> getNextEQ();
@@ -103,6 +105,8 @@ private:
 	bool online_			= false;
 	double dsp_gain_		= 0;
 	double desired_gain_	= 0;
+	
+	std::pair<double, double> sds_;
 
 	// Placement members
 	SpeakerPlacement placement_;
