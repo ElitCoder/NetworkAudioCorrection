@@ -17,4 +17,4 @@ rm -rf curlpp
 rm -rf armadillo-code
 
 # clean matlab
-rm -f matlab/*.wav matlab/eqs
+rm -f matlab/*.wav matlab/eqs matlab/gain

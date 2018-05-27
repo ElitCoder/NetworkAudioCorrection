@@ -1,3 +1,28 @@
+clearvars
+close all
+
+[x, fsx] = audioread('before.wav');
+
+sound_start_sec = 2;
+sound_stop_sec = 30;
+
+% cut silence
+x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
+
+% create spectrum
+N = 8192;
+[Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
+
+fx = fx(1 : N / 2);
+fx = fx * N;
+
+xLin = 0:0.015:log10(length(fx));
+for i = 1:length(xLin)
+    xLog(i) = round(10^xLin(i));
+end
+
+fx = fx(xLog(2:length(xLog)));
+
 eq_file = fopen('eqs', 'r');
 formatSpec = '%f';
 A = fscanf(eq_file, formatSpec);
@@ -20,15 +45,17 @@ for i = 1:9
 end
 
 eqs = subplot(1, 1, 1);
-hold on
+
 for i = 1:num
-    if num < 2
+    if num < 0
         a = eq_matrix(i,:)'; b = num2str(a); c = cellstr(b);
         dx = 0.2; dy = 0.2;
         text(fx(index_vector) + dx, eq_matrix(i,:) + dy, c);
     end
     
+    
     plot(eqs, fx(index_vector), eq_matrix(i,:), '-o');
+    hold on
 end
 
 axis(eqs, [44, 22720, -15, 15]);
@@ -38,8 +65,8 @@ ylabel(eqs, 'dB');
 xlabel(eqs, 'Hz');
 grid on
 
-x0=100;
-y0=200;
+x0=0;
+y0=0;
 width=1920;
 height=300;
 

@@ -52,8 +52,8 @@ low_index = find(fx > 44);
 min_total = min([min(powPx), min(powPy)]) - 3;
 max_total = max([max(powPx(low_index)), max(powPy(low_index))]) + 3;
 
-x_mean = mean(powPx);
-y_mean = mean(powPy);
+%x_mean = mean(powPx);
+%y_mean = mean(powPy);
 
 %set(0, 'DefaultAxesFontSize', 8);
 
@@ -69,9 +69,9 @@ ylabel(both, 'dB');
 xlabel(both, 'Hz');
 grid on
 
-x0=100;
-y0=200;
-width=1366;
-height=220;
+x0=0;
+y0=0;
+width=1920;
+height=300;
 
 set(gcf,'units','points','position',[x0,y0,width,height])
