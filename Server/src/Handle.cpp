@@ -1481,6 +1481,7 @@ static vector<double> getSD(const vector<string>& files, size_t start, size_t st
 }
 
 void Handle::testing() {
+	#if 0
 	// Load files and calculate SD
 	system("ls before*.wav > before");
 	system("ls after*.wav > after");
@@ -1513,6 +1514,7 @@ void Handle::testing() {
 	cout << endl;
 
 	return;
+	#endif
 	
 	try {
 		ifstream file("eqs");
@@ -1531,9 +1533,9 @@ void Handle::testing() {
 		
 		file.close();
 		
-		size_t start = lround(1.5 * 48000.0);
-		size_t stop = lround(3.5 * 48000.0);
-		bool calc_eq = false;
+		size_t start = lround(2 * 48000.0);
+		size_t stop = lround(30 * 48000.0);
+		bool calc_eq = true;
 
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
 		auto after_samples = plotFFTFile("after.wav", start, stop, false);

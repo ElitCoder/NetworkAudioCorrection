@@ -34,7 +34,7 @@ dsp_eq_max: 12
 dsp_eq_min: -12
 enable_customer_profile: 1
 customer_profile: 4 2 -1 -2 -1 -1 -2 3 6
-enable_hardware_profile: 1
+enable_hardware_profile: 0
 hardware_profile_boost_steeps: 0
 hardware_profile_steep_low: -24
 hardware_profile_steep_high: -24
