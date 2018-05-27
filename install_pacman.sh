@@ -10,8 +10,8 @@ sudo pacman -Syy  && sudo pacman -S --needed gcc libcurl-compat cmake
 cores=`grep --count ^processor /proc/cpuinfo`
 
 # install libcurlpp
-git clone https://github.com/jpbarrette/curlpp.git
-cd curlpp/ && mkdir build/ && cd build/ && cmake .. && make -j $cores && sudo make install && cd ../../
+#git clone https://github.com/jpbarrette/curlpp.git
+#cd curlpp/ && mkdir build/ && cd build/ && cmake .. && make -j $cores && sudo make install && cd ../../
 
 # install libnessh
 git clone https://github.com/ElitCoder/nessh.git
