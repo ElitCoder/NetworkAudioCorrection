@@ -1449,7 +1449,71 @@ static vector<short> plotFFTFile(const string& file, size_t start, size_t stop, 
 	return samples;
 }
 
+static vector<double> getSD(const vector<string>& files, size_t start, size_t stop) {
+	vector<double> sds(files.size(), 0.0);
+	
+	// Read files and calculate SD
+	#pragma omp parallel for
+	for (size_t i = 0; i < files.size(); i++) {
+		auto& file = files.at(i);
+		
+		vector<short> data;
+		WavReader::read(file, data);
+		
+		vector<int> ignore;
+
+		if (Base::config().get<bool>("enable_hardware_profile")) {
+			auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
+			
+			if (index > 0) {
+				while (index > 0)
+					ignore.push_back(--index);
+			}
+		}
+		
+		auto response = nac::doFFT(data, start, stop);
+		auto peer = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
+		
+		sds.at(i) = peer.second.second;
+	}
+	
+	return sds;
+}
+
 void Handle::testing() {
+	// Load files and calculate SD
+	system("ls before*.wav > before");
+	system("ls after*.wav > after");
+	
+	ifstream before("before");
+	ifstream after("after");
+	
+	vector<string> before_files;
+	vector<string> after_files;
+	
+	string tmp;
+	
+	while (before >> tmp)
+		before_files.push_back(tmp);
+		
+	while (after >> tmp)
+		after_files.push_back(tmp);
+		
+	before.close();
+	after.close();
+	
+	system("rm before after");
+	
+	vector<double> before_sd = getSD(before_files, 2 * 48000, 30 * 48000);
+	vector<double> after_sd = getSD(after_files, 2 * 48000, 30 * 48000);
+	
+	for (size_t i = 0; i < before_files.size(); i++)
+		cout << before_files.at(i) << " " << before_sd.at(i) << " " << after_sd.at(i) << endl;
+	
+	cout << endl;
+
+	return;
+	
 	try {
 		ifstream file("eqs");
 		
