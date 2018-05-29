@@ -48,14 +48,14 @@ end
 fy = fy(xLog(2:length(xLog)));
 powPy = newPowPy;
 
-low_index = find(fx > 44);
+all_index = find(fx >= 43 & fx <= 22721);
+fx = fx(all_index);
+fy = fy(all_index);
+powPx = powPx(all_index);
+powPy = powPy(all_index);
+
 min_total = min([min(powPx), min(powPy)]) - 3;
-max_total = max([max(powPx(low_index)), max(powPy(low_index))]) + 3;
-
-%x_mean = mean(powPx);
-%y_mean = mean(powPy);
-
-%set(0, 'DefaultAxesFontSize', 8);
+max_total = max([max(powPx), max(powPy)]) + 3;
 
 %Adds a combined plot of both curves for comparing
 both = subplot(1, 1, 1);
@@ -72,6 +72,6 @@ grid on
 x0=0;
 y0=0;
 width=1920;
-height=300;
+height=250;
 
 set(gcf,'units','points','position',[x0,y0,width,height])

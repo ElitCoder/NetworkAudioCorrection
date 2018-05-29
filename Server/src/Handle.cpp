@@ -1456,6 +1456,7 @@ static vector<short> plotFFTFile(const string& file, size_t start, size_t stop, 
 	return samples;
 }
 
+#if 0
 static vector<double> getSD(const vector<string>& files, size_t start, size_t stop) {
 	vector<double> sds(files.size(), 0.0);
 	
@@ -1486,6 +1487,7 @@ static vector<double> getSD(const vector<string>& files, size_t start, size_t st
 	
 	return sds;
 }
+#endif
 
 void Handle::testing() {
 	#if 0
