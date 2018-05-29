@@ -1,5 +1,7 @@
 #include "System.h"
 #include "Speaker.h"
+#include "Base.h"
+#include "Config.h"
 
 // libcurlpp
 #include <curlpp/cURLpp.hpp>
@@ -46,14 +48,19 @@ Speaker& System::addSpeaker(Speaker& speaker) {
 	cout << "Using backup addSpeaker()\n";
 	cout << "Adding & connecting speaker " << speaker.getIP() << endl;
 	
-	// Enable SSH
-	enableSSH(speaker.getIP());
+	if (!Base::config().get<bool>("enable_testing")) {
+		// Enable SSH
+		enableSSH(speaker.getIP());
 	
-	// Open connection to Speaker if it's offline
-	speaker.setOnline(ssh_.connect(speaker.getIP(), "pass"));
-	
-	if (!speaker.isOnline())
-		cout << "Warning: speaker " << speaker.getIP() << " is not online\n";
+		// Open connection to Speaker if it's offline
+		speaker.setOnline(ssh_.connect(speaker.getIP(), "pass"));
+		
+		if (!speaker.isOnline())
+			cout << "Warning: speaker " << speaker.getIP() << " is not online\n";
+	} else {
+		// Set to online for testing
+		speaker.setOnline(true);
+	}
 	
 	// Add speaker to list
 	speakers_.push_back(speaker);

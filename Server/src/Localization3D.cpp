@@ -271,7 +271,7 @@ double diffZ(const vector<Point>& points) {
 	return sqrt(sum);
 }
 
-vector<array<double, 3>> Localization3D::run(const Localization3DInput& input, bool fast_calcuation) {
+vector<vector<double>> Localization3D::run(const Localization3DInput& input, bool fast_calcuation) {
 	g_degree_accuracy = Base::config().get<int>("degree_accuracy");
 	g_point_accuracy = Base::config().get<double>("point_accuracy");
 	PI = atan(1) * 4;
@@ -350,13 +350,14 @@ vector<array<double, 3>> Localization3D::run(const Localization3DInput& input, b
 		g_degree_accuracy--;
 	}
 	
-	vector<array<double, 3>> final_result;
+	vector<vector<double>> final_result;
 	
 	if (has_solution) {
 		cout << "Debug: Localization3D got solution with accuracy " << best_point << " m and z_diff " << best_z_diff << endl; 
 		
 		for (auto& point : best_points) {
-			final_result.push_back(point.getPosition());
+			vector<double> position(point.getPosition().begin(), point.getPosition().begin() + (Base::config().get<bool>("use_2d") ? 2 : 3));
+			final_result.push_back(position);
 		}
 		
 		return final_result;
@@ -364,7 +365,8 @@ vector<array<double, 3>> Localization3D::run(const Localization3DInput& input, b
 		cout << "Debug: no solution available\n";
 		
 		for (auto& point : points) {
-			final_result.push_back(point.getPosition());
+			vector<double> position(point.getPosition().begin(), point.getPosition().begin() + (Base::config().get<bool>("use_2d") ? 2 : 3));
+			final_result.push_back(position);
 		}
 	}
 	

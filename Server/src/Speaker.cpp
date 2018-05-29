@@ -313,7 +313,7 @@ Speaker::SpeakerPlacement::SpeakerPlacement(const string& ip) {
 	ip_ = ip;
 }
 
-void Speaker::SpeakerPlacement::setCoordinates(const array<double, 3>& coordinates) {
+void Speaker::SpeakerPlacement::setCoordinates(const vector<double>& coordinates) {
 	coordinates_ = coordinates;
 }
 
@@ -326,7 +326,7 @@ void Speaker::SpeakerPlacement::addDistance(const string& ip, double distance) {
 		(*iterator) = { ip, distance };
 }
 
-const array<double, 3>& Speaker::SpeakerPlacement::getCoordinates() const {
+const vector<double>& Speaker::SpeakerPlacement::getCoordinates() const {
 	return coordinates_;
 }
 

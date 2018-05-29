@@ -834,24 +834,33 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool only_rms) {
 		cout << mic_ip << " sound level " << sound_level << " dB\n";
 		
 		if (!only_rms) {
-			//auto fft_output = nac::toDecibel(nac::doFFT(sound));
-			auto fft_output = nac::doFFT(sound);
-			auto applied = fft_output;
+			auto response = nac::doFFT(sound);
+			auto speaker_eq = Base::system().getSpeakerProfile().getSpeakerEQ();
 			
-			vector<int> ignore;
-
+			cout << "Transformed to:\n";
+			auto peer = nac::fitBands(response, speaker_eq, false);
+			
 			if (Base::config().get<bool>("enable_hardware_profile")) {
-				auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
+				response = nac::toDecibel(response);
 				
-				if (index > 0) {
-					while (index > 0)
-						ignore.push_back(--index);
+				auto speaker_profile = Base::system().getSpeakerProfile().invert();
+				auto mic_profile = Base::system().getMicrophoneProfile().invert();
+				
+				if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
+					speaker_profile = Base::system().getSpeakerProfile();
+					mic_profile = Base::system().getMicrophoneProfile();
 				}
+				
+				response = nac::applyProfiles(response, speaker_profile, mic_profile);
+				
+				// Revert back to energy
+				response = nac::toLinear(response);
+				
+				cout << "After hardware profile:\n";
+				peer = nac::fitBands(response, speaker_eq, false);
 			}
 			
-			auto peer = nac::fitBands(applied, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
-			
-			Base::system().getSpeaker(mic_ip).setSD(peer.second);
+			Base::system().getSpeaker(mic_ip).setSD({ peer.second, peer.second });
 		}
 	}
 }
@@ -1015,6 +1024,7 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 		for (size_t i = 0; i < speakers.size(); i++) {
 			auto* speaker = speakers.at(i);
 			
+			#if 0
 			// Don't exceed the DSP limit
 			if (speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) > 0) {
 				cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() + final_change.at(i) << ")\n";
@@ -1022,6 +1032,7 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 				
 				continue;
 			}
+			#endif
 			
 			final_gains.push_back(speaker->getDSPGain() + final_change.at(i));
 		}
@@ -1097,6 +1108,102 @@ static double getRelativeSignalGain(int type) {
 	#endif
 }
 
+static void parseSpeakerResponseParallel(const string& mic_ip, const vector<string>& speaker_ips, int play, int idle, const vector<short>& data, bool run_white_noise, vector<vector<double>>& new_eqs) {
+	#pragma omp parallel for
+	for (size_t i = 0; i < speaker_ips.size(); i++) {
+		double sound_start_sec = static_cast<double>(idle) * 2 + (i * (play + idle));
+		double sound_stop_sec = sound_start_sec + play - idle * 2;
+		size_t sound_start = lround(sound_start_sec * 48000.0);
+		size_t sound_stop = lround(sound_stop_sec * 48000.0);
+		
+		vector<double> dbs;
+		vector<double> final_eq;
+		
+		if (run_white_noise) {
+			auto response = getWhiteResponse(data, sound_start, sound_stop);
+			//response = nac::toDecibel(response);
+			
+			dbs = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
+			Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
+			
+			// Calculate speaker EQ
+			if (Base::config().get<bool>("simulate_eq_settings")) {
+				final_eq = nac::findSimulatedEQSettings(data, Base::system().getSpeakerProfile().getFilter(), sound_start, sound_stop);
+				
+				cout << "Returned final_eq: ";
+				for (auto& setting : final_eq)
+					cout << setting << " ";
+				cout << endl;
+			} else {
+				cout << "Transformed to:\n";
+				auto negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
+				
+				if (Base::config().get<bool>("enable_hardware_profile")) {
+					response = nac::toDecibel(response);
+					
+					auto speaker_profile = Base::system().getSpeakerProfile().invert();
+					auto mic_profile = Base::system().getMicrophoneProfile().invert();
+					
+					if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
+						speaker_profile = Base::system().getSpeakerProfile();
+						mic_profile = Base::system().getMicrophoneProfile();
+					}
+					
+					response = nac::applyProfiles(response, speaker_profile, mic_profile);
+					
+					// Revert back to energy
+					response = nac::toLinear(response);
+					
+					cout << "After hardware profile:\n";
+					negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
+				}
+				
+				// Negative response to get change curve
+				vector<double> change_eq;
+				
+				for (auto& value : negative_curve)
+					change_eq.push_back(value * (-1));
+				
+				final_eq = change_eq;
+			}
+		} else {
+			// Calculate FFT for 9 band as well
+			auto db_linears = getFFT9(data, sound_start, sound_stop);
+			
+			for (auto& db_linear : db_linears) {
+				double db = 20 * log10(db_linear);
+				
+				dbs.push_back(db);
+			}
+			
+			// How much does this microphone get per frequency?
+			cout << "Microphone (" << mic_ip << ") gets from " << speaker_ips.at(i) << ":\n";
+			for (size_t j = 0; j < dbs.size(); j++)
+				cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
+			
+			// Calculate correction EQ
+			auto eq = getSoundImageCorrection(dbs);
+			
+			cout << "Which gives the correction EQ of:\n";
+			for (size_t j = 0; j < eq.size(); j++)
+				cout << "Frequency " << g_frequencies.at(j) << "\t " << eq.at(j) << " dB\n";
+				
+			final_eq = eq;
+		}
+		
+		new_eqs.at(i) = final_eq;
+		
+		double sound_level = getRMS(data, sound_start, sound_stop);
+		sound_level = 20 * log10(sound_level / (double)SHRT_MAX);
+		
+		#pragma omp critical
+		{
+			Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
+			Base::system().getSpeaker(mic_ip).setSoundLevelFrom(speaker_ips.at(i), sound_level);
+		}
+	}
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, const vector<double>& gains, bool factor_calibration, int type) {
 	auto adjusted_final_gain = getRelativeSignalGain(type);
 	cout << "adjusted_final_gain " << adjusted_final_gain << endl;
@@ -1159,14 +1266,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		runTestSoundImage(speaker_ips, mic_ips, Base::config().get<string>("white_noise"));
 		Base::system().getRecordings(mic_ips);
 		
-		// Get sound level from white noise
-		//auto flat_level_db = getSoundLevel(mic_ips);
-		
-		//cout << "White noise sound level: " << flat_level_db << endl;
-		//cout << "Setting target mean to " << flat_level_db << endl;
-		
-		//g_target_mean = flat_level_db;
-		
 		// See calibration score before calibrating
 		showCalibrationScore(mic_ips, false);
 		
@@ -1197,7 +1296,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	MicWantedEQ wanted_eqs(mic_ips.size());
 	
 	// Go through frequency analysis
-	//#pragma omp parallel for
+	#pragma omp parallel for
 	for (size_t z = 0; z < mic_ips.size(); z++) {
 		auto& mic_ip = mic_ips.at(z);
 		string filename = "results/cap" + mic_ip + ".wav";
@@ -1207,128 +1306,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 		
 		vector<vector<double>> new_eqs(speaker_ips.size());
 		
-		#pragma omp parallel for
-		for (size_t i = 0; i < speaker_ips.size(); i++) {
-			double sound_start_sec = static_cast<double>(idle) * 2 + (i * (play + idle));
-			double sound_stop_sec = sound_start_sec + play - idle * 2;
-			size_t sound_start = lround(sound_start_sec * 48000.0);
-			size_t sound_stop = lround(sound_stop_sec * 48000.0);
-			
-			vector<double> dbs;
-			vector<double> final_eq;
-			
-			if (run_white_noise) {
-				auto response = getWhiteResponse(data, sound_start, sound_stop);
-				//response = nac::toDecibel(response);
-				
-				dbs = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
-				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
-				
-				// Calculate speaker EQ
-				if (Base::config().get<bool>("simulate_eq_settings")) {
-					final_eq = nac::findSimulatedEQSettings(data, Base::system().getSpeakerProfile().getFilter(), sound_start, sound_stop);
-					
-					cout << "Returned final_eq: ";
-					for (auto& setting : final_eq)
-						cout << setting << " ";
-					cout << endl;
-				} else {
-					cout << "Transformed to:\n";
-					auto negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
-					
-					if (Base::config().get<bool>("enable_hardware_profile")) {
-						response = nac::toDecibel(response);
-						
-						auto speaker_profile = Base::system().getSpeakerProfile().invert();
-						auto mic_profile = Base::system().getMicrophoneProfile().invert();
-						
-						if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-							speaker_profile = Base::system().getSpeakerProfile();
-							mic_profile = Base::system().getMicrophoneProfile();
-						}
-						
-						response = nac::applyProfiles(response, speaker_profile, mic_profile);
-						
-						// Revert back to energy
-						response = nac::toLinear(response);
-						
-						cout << "After hardware profile:\n";
-						negative_curve = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
-					}
-					
-					// Negative response to get change curve
-					vector<double> change_eq;
-					
-					for (auto& value : negative_curve)
-						change_eq.push_back(value * (-1));
-					
-					final_eq = change_eq;
-				}
-				
-				#if 0
-				auto eq_settings = Base::system().getSpeakerProfile().getSpeakerEQ();
-				
-				auto response = getWhiteResponse(data, sound_start, sound_stop);
-				response = nac::toDecibel(response);
-				
-				auto fit_response = nac::fitBands(response, eq_settings, true);
-				
-				auto difference = nac::getDifference(response, 0, true);
-				auto applied = difference;
-				
-				if (Base::config().get<bool>("enable_hardware_profile")) {
-					auto speaker_profile = Base::system().getSpeakerProfile();
-					auto mic_profile = Base::system().getMicrophoneProfile();
-					
-					if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-						speaker_profile = speaker_profile.invert();
-						mic_profile = mic_profile.invert();
-					}
-					
-					applied = nac::applyProfiles(difference, speaker_profile, mic_profile);
-				}
-				
-				final_eq = nac::fitBands(applied, eq_settings, true);
-				dbs = fit_response;
-				
-				Base::system().getSpeaker(mic_ip).setdBType(DB_TYPE_POWER);
-				#endif
-			} else {
-				// Calculate FFT for 9 band as well
-				auto db_linears = getFFT9(data, sound_start, sound_stop);
-				
-				for (auto& db_linear : db_linears) {
-					double db = 20 * log10(db_linear);
-					
-					dbs.push_back(db);
-				}
-				
-				// How much does this microphone get per frequency?
-				cout << "Microphone (" << mic_ip << ") gets from " << speaker_ips.at(i) << ":\n";
-				for (size_t j = 0; j < dbs.size(); j++)
-					cout << "Frequency " << g_frequencies.at(j) << "\t " << dbs.at(j) << " dB\n";
-				
-				// Calculate correction EQ
-				auto eq = getSoundImageCorrection(dbs);
-				
-				cout << "Which gives the correction EQ of:\n";
-				for (size_t j = 0; j < eq.size(); j++)
-					cout << "Frequency " << g_frequencies.at(j) << "\t " << eq.at(j) << " dB\n";
-					
-				final_eq = eq;
-			}
-			
-			new_eqs.at(i) = final_eq;
-			
-			double sound_level = getRMS(data, sound_start, sound_stop);
-			sound_level = 20 * log10(sound_level / (double)SHRT_MAX);
-			
-			#pragma omp critical
-			{
-				Base::system().getSpeaker(mic_ip).setFrequencyResponseFrom(speaker_ips.at(i), dbs);
-				Base::system().getSpeaker(mic_ip).setSoundLevelFrom(speaker_ips.at(i), sound_level);
-			}
-		}
+		parseSpeakerResponseParallel(mic_ip, speaker_ips, play, idle, data, run_white_noise, new_eqs);
 		
 		// Add this to further calculations when we have all the information
 		wanted_eqs.at(z) = new_eqs;
@@ -1405,17 +1383,6 @@ void Handle::resetIPs(const vector<string>& ips) {
 	enableAudioSystem(ips);
 }
 
-#if 0
-void Handle::setBestEQ(const vector<string>& speakers, const vector<string>& mics) {
-	// Reset mics & enable audio system
-	resetIPs(mics);
-	
-	// Set best EQ & enable audio system for speakers
-	setSpeakersEQ(speakers, TYPE_BEST_EQ);
-	enableAudioSystem(speakers);
-}
-#endif
-
 void Handle::setEQStatus(const vector<string>& ips, bool status) {
 	Base::system().runScript(ips, vector<string>(ips.size(), "dspd -s -" + string((status ? "u" : "b")) + " preset; wait\n"));
 }
@@ -1490,6 +1457,40 @@ static vector<double> getSD(const vector<string>& files, size_t start, size_t st
 #endif
 
 void Handle::testing() {
+	vector<string> speaker_ips = { "1" };
+	vector<string> mic_ips = { "192.168.0.13", "192.168.0.14", "192.168.0.18", "192.168.0.19" };
+	
+	int play = Base::config().get<int>("play_time");
+	int idle = Base::config().get<int>("idle_time");
+	
+	MicWantedEQ wanted_eqs(mic_ips.size());
+	
+	// Go through frequency analysis
+	#pragma omp parallel for
+	for (size_t z = 0; z < mic_ips.size(); z++) {
+		auto& mic_ip = mic_ips.at(z);
+		string filename = "before" + mic_ip + ".wav";
+		
+		vector<short> data;
+		WavReader::read(filename, data);
+		
+		vector<vector<double>> new_eqs(speaker_ips.size());
+		
+		parseSpeakerResponseParallel(mic_ip, speaker_ips, play, idle, data, true, new_eqs);
+		
+		// Add this to further calculations when we have all the information
+		wanted_eqs.at(z) = new_eqs;
+	}
+	
+	for (size_t i = 0; i < wanted_eqs.size(); i++) {
+		cout << "Setting EQ: ";
+		for (auto& setting : wanted_eqs.at(i).front())
+			cout << setting << " ";
+		cout << endl;
+	}
+	
+	return;
+	
 	#if 0
 	// Load files and calculate SD
 	system("ls before*.wav > before");

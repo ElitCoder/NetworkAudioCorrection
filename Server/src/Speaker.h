@@ -22,16 +22,16 @@ public:
 		explicit SpeakerPlacement();
 		explicit SpeakerPlacement(const std::string& ip);
 		
-		void setCoordinates(const std::array<double, 3>& coordinates);
+		void setCoordinates(const std::vector<double>& coordinates);
 		void addDistance(const std::string& ip, double distance);
 		
-		const std::array<double, 3>& getCoordinates() const;
+		const std::vector<double>& getCoordinates() const;
 		const std::vector<std::pair<std::string, double>>& getDistances() const;
 		const std::string& getIp();
 		
 	private:
 		std::vector<std::pair<std::string, double>> distances_;
-		std::array<double, 3> coordinates_ = {{ 0, 0, 0 }};
+		std::vector<double> coordinates_ = {{ 0, 0, 0 }};
 		
 		std::string ip_	= "not set";
 	};
