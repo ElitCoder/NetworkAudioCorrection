@@ -128,7 +128,7 @@ void resetEverything(const vector<string>& ips) {
 static void setTestSpeakerSettings(const vector<string>& ips) {
 	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
-	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 2; wait; ";
+	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
 	
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
@@ -314,11 +314,13 @@ static void setGain(const vector<string>& speaker_ips, const vector<double>& gai
 		auto& speaker = Base::system().getSpeaker(speaker_ips.at(i));
 		auto gain = gains.at(i);
 		
+		#if 0
 		if (gain > 0) {
 			cout << "Warning: gain > 0, setting to 0\n";
 			
 			gain = 0;
 		}
+		#endif
 		
 		unsigned char bytes[4];
 		to_523(dB_to_linear_gain(gain), bytes);
@@ -1027,6 +1029,7 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 		for (size_t i = 0; i < speakers.size(); i++) {
 			auto* speaker = speakers.at(i);
 			
+			#if 0
 			// Don't exceed the DSP limit
 			if (speaker->getDSPGain() + speaker->getLoudestBestEQ() > 0) {
 				cout << "Warning: override DSP gain! (" << speaker->getDSPGain() + speaker->getLoudestBestEQ() << ")\n";
@@ -1034,6 +1037,7 @@ static void setCalibratedSoundLevel(const vector<string>& speaker_ips, const vec
 				
 				continue;
 			}
+			#endif
 			
 			final_gains.push_back(speaker->getDSPGain());
 		}
@@ -1374,6 +1378,9 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			
 			showCalibrationScore(mic_ips, true);
 		}
+	} else {
+		// Set back to 0 dB DSP gain
+		setGain(speaker_ips, vector<double>(speaker_ips.size(), 0.0));
 	}
 	
 	if (Base::config().get<bool>("enable_customer_profile")) {
