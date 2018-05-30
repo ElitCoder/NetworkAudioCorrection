@@ -126,7 +126,8 @@ void resetEverything(const vector<string>& ips) {
 }
 
 static void setTestSpeakerSettings(const vector<string>& ips) {
-	string command =	"dspd -s -w; wait; dspd -s -m; wait; dspd -s -u limiter; wait; dspd -s -u static; wait; ";
+	string command =	"dspd -s -w; wait; dspd -s -m; wait; " /*dspd -s -u limiter; wait;*/;
+	command +=			"dspd -s -u static; wait; ";
 	command +=			"dspd -s -u preset; wait; dspd -s -p flat; wait; ";
 	command +=			"amixer -c1 sset 'Headphone' 57 on; wait; amixer -c1 sset 'Capture' 63; wait; amixer -c1 sset 'PGA Boost' 1; wait; ";
 	command +=			"amixer -c1 cset numid=170 0x00,0x80,0x00,0x00; wait\n";		/* Sets DSP gain to 0 */
