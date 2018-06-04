@@ -217,8 +217,9 @@ int main() {
 	Profile microphone;
 	microphone.setCutoffs(low_cutoff, high_cutoff);
 	
-	auto steep_low = Base::config().get<double>("hardware_profile_steep_low");
-	auto steep_high = Base::config().get<double>("hardware_profile_steep_high");
+	// / 2.0 since we're doing shelf filter instead of steeping
+	auto steep_low = Base::config().get<double>("hardware_profile_steep_low") / 2.0;
+	auto steep_high = Base::config().get<double>("hardware_profile_steep_high") / 2.0;
 	
 	speaker.setSteep(steep_low, steep_high);
 	microphone.setSteep(steep_low, steep_high);

@@ -83,10 +83,13 @@ namespace nac {
 			in.push_back((double)samples.at(i) / (double)SHRT_MAX);
 		
 		const int N = 8192;
+		//const int N = 48000;
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
 		vector<double> frequencies;
+		
+		//cout << "size: " << y.size() << endl;
 		
 		// pwelch() output is [0, fs)
 		for (size_t i = 0; i < y.size() / 2; i++) {
@@ -118,6 +121,11 @@ namespace nac {
 		auto steep_low = max(speaker_profile.getSteepLow(), microphone_profile.getSteepLow());
 		auto steep_high = max(speaker_profile.getSteepHigh(), microphone_profile.getSteepHigh());
 		
+		//cout << "low " << low << endl;
+		//cout << "high " << high << endl;
+		//cout << "steep_low " << steep_low << endl;
+		//cout << "steep_high " << steep_high << endl;
+		
 		FFTOutput output = input;
 		
 		// Actually N / 2
@@ -132,15 +140,27 @@ namespace nac {
 			
 			// How steep should this be?
 			if (frequency < low) {
+				db += steep_low;
+				
+				#if 0
+				//cout << "Attenuating frequency " << frequency << endl;
+				
 				double steps = log2(low / frequency);
 				double attenuation = steps * steep_low;
 				
-				db += attenuation;				
+				db += attenuation;
+				
+				//cout << "With " << attenuation << " since steps is " << steps << endl;
+				#endif
 			} else if (frequency > high) {
+				db += steep_high;
+				
+				#if 0
 				double steps = log2(frequency / high);
 				double attenuation = steps * steep_high;
 				
 				db += attenuation;
+				#endif
 			}
 		}
 			
@@ -207,11 +227,6 @@ namespace nac {
 				auto speaker_profile = Base::system().getSpeakerProfile().invert();
 				auto mic_profile = Base::system().getMicrophoneProfile().invert();
 				
-				if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-					speaker_profile = Base::system().getSpeakerProfile();
-					mic_profile = Base::system().getMicrophoneProfile();
-				}
-				
 				response = nac::applyProfiles(response, speaker_profile, mic_profile);
 				
 				// Revert back to energy
@@ -224,7 +239,7 @@ namespace nac {
 			auto& negative_curve = peer.first;
 			auto& db_std_dev = peer.second;
 
-			// Negative response to get change curve
+			// Negate response to get change curve
 			vector<double> eq;
 			
 			for (auto& value : negative_curve)
@@ -236,8 +251,8 @@ namespace nac {
 			}
 			
 			if (!best_eq.empty()) {
-				if (i > 10) {
-					if (best_score < 0.1)
+				if (i > Base::config().get<int>("max_simulation_iterations") / 2) {
+					if (best_score < 0.05)
 						break;
 				}
 			}

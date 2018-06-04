@@ -847,11 +847,6 @@ static void showCalibrationScore(const vector<string>& mic_ips, bool only_rms) {
 				auto speaker_profile = Base::system().getSpeakerProfile().invert();
 				auto mic_profile = Base::system().getMicrophoneProfile().invert();
 				
-				if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-					speaker_profile = Base::system().getSpeakerProfile();
-					mic_profile = Base::system().getMicrophoneProfile();
-				}
-				
 				response = nac::applyProfiles(response, speaker_profile, mic_profile);
 				
 				// Revert back to energy
@@ -1257,11 +1252,6 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 						
 						auto speaker_profile = Base::system().getSpeakerProfile().invert();
 						auto mic_profile = Base::system().getMicrophoneProfile().invert();
-						
-						if (Base::config().get<bool>("hardware_profile_boost_steeps")) {
-							speaker_profile = Base::system().getSpeakerProfile();
-							mic_profile = Base::system().getMicrophoneProfile();
-						}
 						
 						response = nac::applyProfiles(response, speaker_profile, mic_profile);
 						
