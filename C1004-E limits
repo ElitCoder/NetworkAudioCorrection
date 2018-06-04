@@ -1,0 +1,34 @@
+PINK:
+HW 6:	bra
+6:	inte bra
+0:	inte jättebra
+HW 0:	bra
+-6:	okej
+HW -6:	bra
+
+WHITE:
+HW 6:	inte bra
+6:	okej
+-6:	bra
+HW -6:	bra, förutom bas
+HW 0:	bättre än HW -6, fortfarande dålig bas
+HW 3:	ungefär lika bra som HW 0, samma problem med bas
+3:	okej, inte perfekt
+0:	sämre än 3
+
+ALLA BRA:
+PINK:
+HW -6
+HW 0
+HW 6
+
+WHITE:
+-6
+HW -6
+HW 0
+HW 3
+3
+
+SLUTSATS:
+PINK: 0
+WHITE: 3
