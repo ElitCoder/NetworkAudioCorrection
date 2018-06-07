@@ -74,6 +74,16 @@ static double correctMaxEQ(vector<double>& eq) {
 	return total_mean_change;
 }
 
+static int findBestFFTSize(double fs, double band_width) {
+	// Start number
+	int N = 256;
+	
+	while (fs / (double)N > band_width)
+		N *= 2;
+		
+	return N;
+}
+
 namespace nac {
 	FFTOutput doFFT(const vector<short>& samples, size_t start, size_t stop) {
 		vector<double> in;
@@ -82,14 +92,27 @@ namespace nac {
 		for (size_t i = start; i < (stop == 0 ? samples.size() : stop); i++)
 			in.push_back((double)samples.at(i) / (double)SHRT_MAX);
 		
-		const int N = 8192;
-		//const int N = 48000;
+		// Assure FFT bin resolution is higher than the EQ resolution
+		// Fs / N < lowest octave width
+		// For example, 63 Hz with 1/1 gives 44 - 88 Hz = 44 Hz width
+		
+		auto eq = Base::system().getSpeakerProfile().getSpeakerEQ().first;
+		int N = 8192;
+		
+		if (!eq.empty()) {
+			double width = pow(2.0, 1.0 / (2.0 * Base::config().get<double>("dsp_octave_width")));
+			double lower = eq.front() / width;
+			double upper = eq.front() * width;
+			
+			N = findBestFFTSize(48000, upper - lower);
+		}
+		
+		cout << "Debug: set N to " << N << endl;
+		
 		arma::vec y = arma::abs(sp::pwelch(arma::vec(in), N, N / 2));
 		
 		vector<double> output;
 		vector<double> frequencies;
-		
-		//cout << "size: " << y.size() << endl;
 		
 		// pwelch() output is [0, fs)
 		for (size_t i = 0; i < y.size() / 2; i++) {
@@ -262,7 +285,8 @@ namespace nac {
 			
 			cout << "Adding EQ: ";
 			for (size_t i = 0; i < eq.size(); i++) {
-				eq_change.at(i) += eq.at(i);
+				// Small changes for many bands
+				eq_change.at(i) += eq.at(i) / Base::config().get<double>("dsp_octave_width");
 				
 				cout << eq.at(i) << " ";
 			}
@@ -277,12 +301,11 @@ namespace nac {
 	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
 		auto& eq_frequencies = eq_settings.first;
 		
-		// TODO: Make this more generic by input band size in octaves, e.g. 1/3 octaves and so on
 		// Calculate band limits
 		vector<double> band_limits;
 		
 		for (auto& centre : eq_frequencies) {
-			double width = pow(2.0, 1.0 / 2.0);
+			double width = pow(2.0, 1.0 / (2.0 * Base::config().get<double>("dsp_octave_width")));
 			double lower = centre / width;
 			double upper = centre * width;
 			

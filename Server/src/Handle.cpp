@@ -1529,6 +1529,7 @@ void Handle::testing() {
 	#endif
 	
 	try {
+		#if 0
 		ifstream file("eqs");
 		
 		// Ignore number
@@ -1544,13 +1545,14 @@ void Handle::testing() {
 		}
 		
 		file.close();
+		#endif
 		
 		size_t start = lround(2 * 48000.0);
 		size_t stop = lround(30 * 48000.0);
 		bool calc_eq = true;
 
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
-		auto after_samples = plotFFTFile("after.wav", start, stop, false);
+		//auto after_samples = plotFFTFile("after.wav", start, stop, false);
 		
 		vector<double> final_eq;
 		
@@ -1563,25 +1565,34 @@ void Handle::testing() {
 		plotFFT(before_samples, start, stop);
 		cout << endl;
 		
-		cout << "After:\n";
-		plotFFT(after_samples, start, stop);
-		cout << endl;
+		//cout << "After:\n";
+		//plotFFT(after_samples, start, stop);
+		//cout << endl;
+		
+		vector<pair<int, double>> pair_eq;
+		
+		for (size_t i = 0; i < Base::system().getSpeakerProfile().getSpeakerEQ().first.size(); i++)
+			pair_eq.push_back({ Base::system().getSpeakerProfile().getSpeakerEQ().first.at(i), final_eq.at(i) });
 		
 		cout << "Simulated:\n";
 		vector<short> simulated_samples;
-		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, eq, 48000);
+		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, pair_eq, 48000);
 		plotFFT(simulated_samples, start, stop);
 		cout << endl;
 		
+		#if 0
 		cout << "Actual EQ:\t";
 		for (auto& setting : eq)
 			cout << setting.second << " ";
 		cout << endl;
+		#endif
 
 		if (calc_eq) {
+			#if 0
 			for (size_t i = 0; i < eq.size(); i++)
 				eq.at(i).second = final_eq.at(i);
-				
+			#endif
+			
 			cout << "Simulated EQ:\t";
 			for (auto& setting : final_eq)
 				cout << setting << " ";
