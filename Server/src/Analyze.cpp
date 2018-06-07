@@ -274,7 +274,7 @@ namespace nac {
 			}
 			
 			if (!best_eq.empty()) {
-				if (best_score < 0.1)
+				if (best_score < 0.01)
 					break;
 			}
 			
@@ -286,7 +286,7 @@ namespace nac {
 			cout << "Adding EQ: ";
 			for (size_t i = 0; i < eq.size(); i++) {
 				// Small changes for many bands
-				eq_change.at(i) += eq.at(i) / Base::config().get<double>("dsp_octave_width");
+				eq_change.at(i) += eq.at(i) / Base::config().get<double>("simulation_slowdown");
 				
 				cout << eq.at(i) << " ";
 			}

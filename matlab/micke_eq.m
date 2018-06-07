@@ -12,19 +12,19 @@ x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
 y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
 
 % create spectrum
-N = 8192;
-% [Px, fx] = pwelch(x, [], [], N, fsx);
-% [Py, fy] = pwelch(y, [], [], N, fsy);
-[Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
-[Py, fy] = pwelch(y, N, N / 2, 'twosided', 'power');
-
-Px = Px(1 : N / 2);
-Py = Py(1 : N / 2);
-fx = fx(1 : N / 2);
-fy = fy(1 : N / 2);
-
-fx = fx * N;
-fy = fy * N;
+N = 48000;
+[Px, fx] = pwelch(x, [], [], N, fsx);
+[Py, fy] = pwelch(y, [], [], N, fsy);
+% [Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
+% [Py, fy] = pwelch(y, N, N / 2, 'twosided', 'power');
+% 
+% Px = Px(1 : N / 2);
+% Py = Py(1 : N / 2);
+% fx = fx(1 : N / 2);
+% fy = fy(1 : N / 2);
+% 
+% fx = fx * N;
+% fy = fy * N;
 
 powPx = pow2db(Px);
 powPy = pow2db(Py);
