@@ -251,10 +251,8 @@ namespace nac {
 			}
 			
 			if (!best_eq.empty()) {
-				if (i > Base::config().get<int>("max_simulation_iterations") / 2) {
-					if (best_score < 0.05)
-						break;
-				}
+				if (best_score < 0.1)
+					break;
 			}
 			
 			auto eq_mean = mean(eq);
