@@ -12,7 +12,7 @@ x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
 y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
 
 % create spectrum
-N = 48000;
+N = 24000;
 [Px, fx] = pwelch(x, [], [], N, fsx);
 [Py, fy] = pwelch(y, [], [], N, fsy);
 % [Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
