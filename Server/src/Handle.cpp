@@ -126,8 +126,8 @@ void resetEverything(const vector<string>& ips) {
 
 static void setTestSpeakerSettings(const vector<string>& ips) {
 	/* Note: this is for c8033 with modded dspd */
-	string command =	"dspd -s -w Flat; wait; ";
-	command +=			"amixer -c0 sset 'Headphone' 57 on; wait; amixer -c0 sset 'Capture' 63; wait; amixer -c0 sset 'PGA Boost' 2; wait; ";
+	string command =	"dspd -w Flat; wait; ";
+	command +=			"amixer -c0 sset 'Headphone' 57 on; wait; amixer -c0 sset 'Capture' 63; wait; amixer -c0 sset 'PGA Boost' 1; wait; ";
 
 	Base::system().runScript(ips, vector<string>(ips.size(), command));
 
