@@ -4,7 +4,7 @@ port: 10200
 # Files
 goertzel: 4000_1s.wav
 sound_image_file_short: 9_freq_3s.wav
-white_noise: white_noise_30s.wav
+white_noise: pink_noise_30s.wav
 
 # Testing
 no_scripts: 0
@@ -17,7 +17,7 @@ play_time_localization: 1
 validate_white_noise: 1
 enable_testing: 0
 # Should we divide with bandwidth?
-is_white_noise: 1
+is_white_noise: 0
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -43,9 +43,9 @@ dsp_eq_q: 1
 #dsp_octave_width: 12
 #dsp_eq_q: 24
 
-dsp_eq_max: 36
-dsp_eq_min: -36
-enable_customer_profile: 1
+dsp_eq_max: 24
+dsp_eq_min: -24
+enable_customer_profile: 0
 customer_profile: 4 2.5 1 -1 -1.5 0 2 3 4
 # Shelf filter - steep is per octave, so -12 dB for each frequency bin
 enable_hardware_profile: 0
@@ -54,9 +54,9 @@ hardware_profile_steep_high: -24
 hardware_profile_cutoff_low: 100
 hardware_profile_cutoff_high: 17000
 # Which level the DSP will set when testing white noise
-calibration_safe_gain: 3
+calibration_safe_gain: 0
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
-safe_dsp_max: 800
+safe_dsp_max: 0
 enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
