@@ -2,8 +2,6 @@ Build essentials:
 apt: ./install_apt.sh
 pacman: ./install_pacman.sh
 
-For Arch-based distros, most of the libraries needed can be found in the AUR, such as libcurlpp.
-
 FIRST USE (Server & Client):
 1. Install build essentials using the command above
 2. Compile using ./create.sh
@@ -12,3 +10,6 @@ FIRST USE (Server & Client):
 Configuration:
 Server has a config file at Server/config
 Client has a config file at Client/config
+
+Guide:
+The Server controls all connections to the hardware devices while the Client requests the Server.

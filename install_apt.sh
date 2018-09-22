@@ -21,7 +21,7 @@ cd nessh/ && ./install_apt.sh && cd ../
 sudo cp -r dependencies/sigpack/ /usr/include/
 
 # install libarmadillo
-git clone -b 8.500.x https://github.com/conradsnicta/armadillo-code.git
+git clone -b 8.500.x https://gitlab.com/conradsnicta/armadillo-code
 cd armadillo-code/ && cmake . && make -j $cores && sudo make install && cd ../
 
 # clean repo

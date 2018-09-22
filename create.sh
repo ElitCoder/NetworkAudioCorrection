@@ -4,7 +4,7 @@
 if [ $# -ne 0 ]; then
 	./clean.sh
 fi
-	
+
 # number of cores available
 cores=`grep --count ^processor /proc/cpuinfo`
 
