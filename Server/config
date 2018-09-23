@@ -14,7 +14,8 @@ play_time: 30
 idle_time: 1
 play_time_freq: 3
 play_time_localization: 1
-validate_white_noise: 1
+validate_white_noise: 0
+ignore_new_eq_settings: 1
 enable_testing: 0
 # Should we divide with bandwidth?
 is_white_noise: 0
@@ -29,9 +30,14 @@ timeout: 120
 
 # Sound settings
 # 9-band EQ
-dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+#dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+#dsp_octave_width: 1
+#dsp_eq_q: 1
+
+# Kenwood GE-52B
+dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
 dsp_octave_width: 1
-dsp_eq_q: 1
+dsp_eq_q: 0.667
 
 # Proposed Axis 27-band EQ
 #dsp_eq: 50 63 80 100 125 160 200 250 315 400 500 630 800 1000 1250 1600 2000 2500 3150 4000 5000 6300 8000 10000 12500 16000 20000
@@ -43,8 +49,8 @@ dsp_eq_q: 1
 #dsp_octave_width: 12
 #dsp_eq_q: 24
 
-dsp_eq_max: 24
-dsp_eq_min: -24
+dsp_eq_max: 10
+dsp_eq_min: -10
 enable_customer_profile: 0
 customer_profile: 4 2.5 1 -1 -1.5 0 2 3 4
 # Shelf filter - steep is per octave, so -12 dB for each frequency bin
@@ -61,5 +67,5 @@ enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
-simulation_slowdown: 1
-max_simulation_iterations: 20
+simulation_slowdown: 4
+max_simulation_iterations: 40

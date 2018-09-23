@@ -1116,6 +1116,7 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	// Set g_dsp_factor
 	bool run_white_noise = false;
 	bool run_validation = Base::config().get<bool>("validate_white_noise");
+	bool ignore_new_eq_settings = Base::config().get<bool>("ignore_new_eq_settings");
 
 	if (type == WHITE_NOISE)
 		run_white_noise = true;
@@ -1332,7 +1333,8 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 	for (size_t i = 0; i < mics.size(); i++)
 		mics.at(i)->setDesiredGain(gains.at(i));
 
-	setEQ(speaker_ips, TYPE_BEST_EQ);
+	if (!ignore_new_eq_settings)
+		setEQ(speaker_ips, TYPE_BEST_EQ);
 
 	if (run_validation) {
 		// Play white noise from all speakers to check sound image & collect the recordings
