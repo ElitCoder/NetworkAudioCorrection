@@ -375,6 +375,8 @@ static void setEQ(const vector<string>& speaker_ips, int type) {
 
 	for (auto* speaker : speakers) {
 		vector<double> eq(Base::system().getSpeakerProfile().getNumEQBands(), 0);
+		auto q = Base::config().get<double>("dsp_eq_q");
+		auto eq_frequencies = Base::config().getAll<int>("dsp_eq");
 
 		switch (type) {
 			case TYPE_BEST_EQ: case TYPE_WHITE_EQ: eq = speaker->getBestEQ();
@@ -390,6 +392,14 @@ static void setEQ(const vector<string>& speaker_ips, int type) {
 			command += to_string(setting) + ",";
 
 		command.pop_back();
+		command += " -f ";
+
+		for (auto frequency : eq_frequencies)
+			command += frequency + ",";
+
+		command.pop_back();
+		command += " -a ";
+		command += q;
 		command += "; wait\n";
 
 		commands.push_back(command);

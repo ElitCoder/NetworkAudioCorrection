@@ -34,14 +34,14 @@ timeout: 120
 # dsp_eq_q - constant Q factor
 
 # 9-band EQ (preset dspd)
-#dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
 #dsp_octave_width: 1
-#dsp_eq_q: 1
+dsp_eq_q: 1
 
 # Android 5-band AudioEffect EQ
-dsp_eq: 60 230 910 4000 14000
-dsp_octave_width: 0.5
-dsp_eq_q: 0.667
+#dsp_eq: 60 230 910 4000 14000
+#dsp_octave_width: 0.5
+#dsp_eq_q: 0.667
 
 # Kenwood GE-52B
 #dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
@@ -58,8 +58,8 @@ dsp_eq_q: 0.667
 #dsp_octave_width: 12
 #dsp_eq_q: 24
 
-dsp_eq_max: 10
-dsp_eq_min: -10
+dsp_eq_max: 24
+dsp_eq_min: -24
 enable_customer_profile: 0
 customer_profile: 4 2.5 1 -1 -1.5 0 2 3 4
 # Shelf filter - steep is per octave, so -12 dB for each frequency bin
@@ -76,5 +76,5 @@ enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
-simulation_slowdown: 4
+simulation_slowdown: 2
 max_simulation_iterations: 60
