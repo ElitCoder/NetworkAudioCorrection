@@ -395,11 +395,11 @@ static void setEQ(const vector<string>& speaker_ips, int type) {
 		command += " -f ";
 
 		for (auto frequency : eq_frequencies)
-			command += frequency + ",";
+			command += to_string(frequency) + ",";
 
 		command.pop_back();
 		command += " -a ";
-		command += q;
+		command += to_string(q);
 		command += "; wait\n";
 
 		commands.push_back(command);
@@ -1119,6 +1119,31 @@ static void parseSpeakerResponseParallel(const string& mic_ip, const vector<stri
 }
 #endif
 
+void writeAPOSettings(const vector<double>& gains) {
+	auto frequencies = Base::config().getAll<int>("dsp_eq");
+	auto q = Base::config().get<double>("dsp_eq_q");
+
+	ofstream file("config.txt");
+
+	if (!file.is_open()) {
+		cout << "Warning: could not open config.txt for APO writing\n";
+		return;
+	}
+
+	// Write preamp
+	file << "Preamp: 0 dB\n";
+
+	for (size_t i = 0; i < min(frequencies.size(), gains.size()); i++) {
+		file << "Filter: ON PK Fc "
+			<< frequencies.at(i) << " Hz Gain "
+			<< gains.at(i) << " dB Q "
+			<< q
+			<< endl;
+	}
+
+	file.close();
+}
+
 void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<string>& mic_ips, const vector<double>& gains, bool factor_calibration, int type) {
 	auto adjusted_final_gain = getRelativeSignalGain(type);
 	cout << "adjusted_final_gain " << adjusted_final_gain << endl;
@@ -1382,6 +1407,13 @@ void Handle::checkSoundImage(const vector<string>& speaker_ips, const vector<str
 			setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain, true);
 	}
 
+	// Write APO settings
+	if (Base::config().get<bool>("write_apo_settings") && speaker_ips.size() < 2) {
+		cout << "Writing APO settings\n";
+		writeAPOSettings(Base::system().getSpeaker(speaker_ips.front()).getBestEQ());
+		cout << "Wrote APO settings\n";
+	}
+
 	// Check desired gain for every microphone
 	//setCalibratedSoundLevel(speaker_ips, mic_ips, adjusted_final_gain);
 
@@ -1572,7 +1604,7 @@ void Handle::testing() {
 		bool calc_eq = true;
 
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
-		//auto after_samples = plotFFTFile("after.wav", start, stop, false);
+		auto after_samples = plotFFTFile("after.wav", start, stop, false);
 
 		vector<double> final_eq;
 
@@ -1585,9 +1617,9 @@ void Handle::testing() {
 		plotFFT(before_samples, start, stop);
 		cout << endl;
 
-		//cout << "After:\n";
-		//plotFFT(after_samples, start, stop);
-		//cout << endl;
+		cout << "After:\n";
+		plotFFT(after_samples, start, stop);
+		cout << endl;
 
 		vector<pair<int, double>> pair_eq;
 
@@ -1599,6 +1631,13 @@ void Handle::testing() {
 		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, pair_eq, 48000);
 		plotFFT(simulated_samples, start, stop);
 		cout << endl;
+
+		// Write APO settings
+		if (Base::config().get<bool>("write_apo_settings")) {
+			cout << "Writing APO settings\n";
+			writeAPOSettings(final_eq);
+			cout << "Wrote APO settings\n";
+		}
 
 		#if 0
 		cout << "Actual EQ:\t";

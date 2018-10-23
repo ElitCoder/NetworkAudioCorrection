@@ -12,7 +12,7 @@ x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
 y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
 
 % create spectrum
-N = 24000;
+N = 48000;
 [Px, fx] = pwelch(x, [], [], N, fsx);
 [Py, fy] = pwelch(y, [], [], N, fsy);
 % [Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
@@ -25,6 +25,15 @@ N = 24000;
 % 
 % fx = fx * N;
 % fy = fy * N;
+
+% Smoothen pink noise by * f
+for i = 1:length(Px)
+    Px(i) = Px(i) * i;
+end
+
+for i = 1:length(Py)
+    Py(i) = Py(i) * i;
+end
 
 powPx = pow2db(Px);
 powPy = pow2db(Py);
@@ -48,7 +57,7 @@ end
 fy = fy(xLog(2:length(xLog)));
 powPy = newPowPy;
 
-all_index = find(fx >= 43 & fx <= 22721);
+all_index = find(fx >= 19 & fx <= 22721);
 fx = fx(all_index);
 fy = fy(all_index);
 powPx = powPx(all_index);
@@ -62,7 +71,7 @@ both = subplot(1, 1, 1);
 plot(both, fx, powPx, 'r');
 hold on
 plot(both, fy, powPy, 'g');
-axis(both, [44, 22720, min_total, max_total]);
+axis(both, [20, 22720, min_total, max_total]);
 set(both, 'XScale', 'log');
 title(both, 'Combined');
 ylabel(both, 'dB');
