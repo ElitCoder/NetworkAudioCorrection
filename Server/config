@@ -37,9 +37,9 @@ timeout: 120
 # dsp_eq_q - constant Q factor
 
 # 9-band EQ (preset dspd)
-dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
 dsp_octave_width: 1
-dsp_eq_q: 0.167
+dsp_eq_q: 0.667
 
 # Android 5-band AudioEffect EQ
 #dsp_eq: 60 230 910 4000 14000
@@ -79,5 +79,5 @@ enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
-simulation_slowdown: 10
-max_simulation_iterations: 60
+simulation_slowdown: 4
+max_simulation_iterations: 20

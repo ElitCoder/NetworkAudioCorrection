@@ -56,18 +56,18 @@ static int getBandIndex(double frequency, const vector<double>& limits) {
 	return -1;
 }
 
-#if 0
 static double correctMaxEQ(vector<double>& eq) {
-	double total_mean_change = 0;
+	//double total_mean_change = 0;
 	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
 	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
 
 	for (int i = 0; i < 1000; i++) {
+		#if 0
 		double mean_db = mean(eq);
 
 		for (auto& setting : eq)
 			setting -= mean_db;
-
+		#endif
 		for (auto& setting : eq) {
 			if (setting < min_eq)
 				setting = min_eq;
@@ -75,17 +75,13 @@ static double correctMaxEQ(vector<double>& eq) {
 				setting = max_eq;
 		}
 
-		total_mean_change += mean_db;
+		//total_mean_change += mean_db;
 	}
 
-	return total_mean_change;
+	return 0;//total_mean_change;
 }
-#endif
 
 static int findBestFFTSize(double fs, double band_width) {
-	return 48000;
-
-#if 0
 	// Start number
 	int N = 256;
 
@@ -93,7 +89,6 @@ static int findBestFFTSize(double fs, double band_width) {
 		N *= 2;
 
 	return N;
-#endif
 }
 
 namespace nac {
@@ -228,7 +223,7 @@ namespace nac {
 		double target_db = 0;
 
 		for (int i = 0; i < Base::config().get<int>("max_simulation_iterations"); i++) {
-			//correctMaxEQ(eq_change);
+			correctMaxEQ(eq_change);
 
 			vector<pair<int, double>> gains;
 

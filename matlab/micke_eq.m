@@ -4,7 +4,7 @@ close all
 [x, fsx] = audioread('before.wav');
 [y, fsy] = audioread('after.wav');
 
-sound_start_sec = 2;
+sound_start_sec = 3;
 sound_stop_sec = 30;
 
 % cut silence
