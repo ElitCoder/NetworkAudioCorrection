@@ -9,26 +9,50 @@
 
 using namespace std;
 
-/* Filter */
-
-FilterBank::Filter::Filter(int frequency, double q) {
+FilterBank::Filter::Filter(int frequency, double q, int type) {
 	frequency_ = frequency;
 	q_ = q;
+	type_ = type;
 }
 
 void FilterBank::Filter::reset(double gain, int fs) {
 	enabled_ = true;
 
-	double w0 = (2 * M_PI * (double)frequency_) / fs;
-	double A = pow(10, (gain / 40));
-	double alpha = sin(w0)/(2 * A * q_);
+	double w0 = 2.0 * M_PI * (double)frequency_ / (double)fs;
+	double A;
+	double alpha;
+	double a0, a1, a2, b0, b1, b2;
 
-	double a0 = 1 + alpha/A;
-    double a1 = -2 * cos(w0);
-    double a2 = 1 - alpha / A;
-    double b0 = (1 + alpha * A);
-    double b1 = -(2 * cos(w0));
-    double b2 = (1 - alpha * A);
+	switch (type_) {
+		case PARAMETRIC:
+			A = pow(10, gain / 40);
+			alpha = sin(w0) / (2 * A * q_);
+			break;
+
+		case BANDPASS:
+			A = pow(10, gain / 20);
+			alpha = sin(w0) * sinh(M_LN2 / 2 * Base::config().get<double>("dsp_eq_bw") * w0 / sin(w0));
+			break;
+
+		default: cout << "ERROR: Filter type not specified";
+			return;
+	}
+
+	if (type_ == PARAMETRIC) {
+		a0 = 1 + alpha/A;
+		a1 = -2 * cos(w0);
+		a2 = 1 - alpha / A;
+		b0 = (1 + alpha * A);
+		b1 = -(2 * cos(w0));
+		b2 = (1 - alpha * A);
+	} else if (type_ == BANDPASS) {
+		a0 = 1 + alpha;
+		a1 = -2 * cos(w0);
+		a2 = 1 - alpha;
+		b0 = alpha;
+		b1 = 0;
+		b2 = -alpha;
+	}
 
 	a_.clear();
 	b_.clear();
@@ -47,25 +71,34 @@ void FilterBank::Filter::process(const vector<double>& in, vector<double>& out) 
 
 	out.clear();
 
-	for (int i = 0; i < (int)in.size(); i++) {
-		double tmp = 0.0;
+	for (size_t i = 0; i < in.size(); i++) {
+		double x_0, x_1, x_2;
+		double y_1, y_2;
 
-		for (int j = 0; j < (int)b_.size(); j++) {
-			if (i - j < 0)
-				continue;
+		x_0 = in[i];
 
-			tmp += b_.at(j) * in.at(i - j);
+		if (i < 2) {
+			x_2 = 0;
+			y_2 = 0;
+
+			if (i < 1) {
+				x_1 = 0;
+				y_1 = 0;
+			} else {
+				x_1 = in[i - 1];
+				y_1 = out[i - 1];
+			}
+		} else {
+			x_1 = in[i - 1];
+			x_2 = in[i - 2];
+			y_1 = out[i - 1];
+			y_2 = out[i - 2];
 		}
 
-		for (int j = 1; j < (int)a_.size(); j++) {
-			if (i - j < 0)
-				continue;
+		double y = (b_[0] / a_[0]) * x_0 + (b_[1] / a_[0]) * x_1 + (b_[2] / a_[0]) * x_2
+										 - (a_[1] / a_[0]) * y_1 - (a_[2] / a_[0]) * y_2;
 
-			tmp -= a_.at(j) * out.at(i - j);
-		}
-
-		tmp /= a_.front();
-		out.push_back(tmp);
+		out.push_back(y);
 	}
 }
 
@@ -81,20 +114,17 @@ int FilterBank::Filter::getFrequency() const {
 	return frequency_;
 }
 
-/* FilterBank */
-
-void FilterBank::addBand(int frequency, double q) {
-	filters_.emplace_back(frequency, q);
+int FilterBank::Filter::getType() const {
+	return type_;
 }
 
-void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, int fs) {
-	out.clear();
+void FilterBank::addBand(int frequency, double q, int type) {
+	filters_.emplace_back(frequency, q, type);
+}
 
-	// Convert to [0, 1] samples
-	vector<double> normalized;
-
-	for (auto& sample : samples)
-		normalized.push_back((double)sample / (double)SHRT_MAX);
+void FilterBank::initializeFiltering(const vector<short>& in, vector<double>& out, const vector<pair<int, double>>& gains, int fs) {
+	for (auto& sample : in)
+		out.push_back((double)sample / (double)SHRT_MAX);
 
 	// Disable filters
 	for (auto& filter : filters_)
@@ -106,14 +136,55 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 		if (iterator != filters_.end())
 			iterator->reset(gain.second, fs);
 	}
+}
 
-	for (auto& filter : filters_) {
-		vector<double> filtered;
-		filter.process(normalized, filtered);
-		normalized = filtered;
+void FilterBank::finalizeFiltering(const vector<double>& in, vector<short>& out) {
+	// Convert to linear again
+	for (auto& sample : in)
+		out.push_back(lround(sample * (double)SHRT_MAX));
+}
+
+void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, int fs) {
+	vector<double> normalized;
+	initializeFiltering(samples, normalized, gains, fs);
+
+	/* Clear outgoing buffer */
+	out.clear();
+
+	/* All filters are of the same type */
+	auto type = filters_.front().getType();
+
+	if (type == PARAMETRIC) {
+		/* Apply filters in cascade */
+		for (auto& filter : filters_) {
+			vector<double> filtered;
+			filter.process(normalized, filtered);
+			normalized = filtered;
+		}
+	} else if (type == BANDPASS) {
+		/* Apply filters in parallel */
+		vector<vector<double>> out_samples(filters_.size(), vector<double>());
+
+		#pragma omp parallel for
+		for (size_t i = 0; i < filters_.size(); i++) {
+			filters_.at(i).process(normalized, out_samples.at(i));
+		}
+
+		/* Clear normalized */
+		normalized = vector<double>(normalized.size(), 0);
+
+		for (size_t j = 0; j < out_samples.size(); j++) {
+			auto& filtered = out_samples.at(j);
+			auto gain = gains.at(j).second;
+
+			double linear_gain = pow(10.0, ((gain - 3.0) / 20.0));
+
+			#pragma omp parallel for
+			for (size_t i = 0; i < normalized.size(); i++) {
+				normalized.at(i) += linear_gain * filtered.at(i);
+			}
+		}
 	}
 
-	// Convert to linear again
-	for (auto& sample : normalized)
-		out.push_back(lround(sample * (double)SHRT_MAX));
+	finalizeFiltering(normalized, out);
 }

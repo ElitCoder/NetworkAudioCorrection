@@ -21,7 +21,7 @@ enable_testing: 0
 is_white_noise: 0
 
 # Write APO settings automatically
-write_apo_settings: 1
+write_apo_settings: 0
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -34,37 +34,25 @@ timeout: 120
 # Sound settings
 # dsp_eq - centre frequencies
 # dsp_octave_width - divider for octave width, e.g 30-band EQ gives 1/3 -> 3
-# dsp_eq_q - constant Q factor
+# dsp_eq_q - constant Q factor (parametric EQ)
+# dsp_eq_bw - bandwidth in octaves (graphic EQ)
 
 # 9-band EQ (preset dspd)
+dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+dsp_octave_width: 1
+dsp_eq_q: 1
+dsp_eq_type: parametric
+
+# 10-band graphic EQ
 dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
 dsp_octave_width: 1
-dsp_eq_q: 0.667
-
-# Android 5-band AudioEffect EQ
-#dsp_eq: 60 230 910 4000 14000
-#dsp_octave_width: 0.5
-#dsp_eq_q: 0.667
-
-# Kenwood GE-52B
-#dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
-#dsp_octave_width: 1
-#dsp_eq_q: 0.667
-
-# Proposed Axis 27-band EQ
-#dsp_eq: 50 63 80 100 125 160 200 250 315 400 500 630 800 1000 1250 1600 2000 2500 3150 4000 5000 6300 8000 10000 12500 16000 20000
-#dsp_octave_width: 3
-#dsp_eq_q: 6
-
-# Test EQ
-#dsp_eq: 44 47 50 53 56 59 62 66 70 74 79 83 88 94 99 105 111 118 125 132 140 149 157 167 177 187 198 210 223 236 250 265 281 297 315 334 354 375 397 420 445 472 500 530 561 595 630 667 707 749 794 841 891 944 1000 1059 1122 1189 1260 1335 1414 1498 1587 1682 1782 1888 2000 2119 2245 2378 2520 2670 2828 2997 3175 3364 3564 3775 4000 4238 4490 4757 5040 5339 5657 5993 6350 6727 7127 7551 8000 8476 8980 9514 10079 10679 11314 11986 12699 13454 14254 15102 16000 16951 17959 19027 20159 21357 22627
-#dsp_octave_width: 12
-#dsp_eq_q: 24
+dsp_eq_bw: 1.0
+dsp_eq_type: graphic
 
 dsp_eq_max: 24
 dsp_eq_min: -24
 enable_customer_profile: 0
-customer_profile: 4 2.5 1 -1 -1.5 0 2 3 4
+customer_profile: 4 4 1 0 0 0 0 0 0 0
 # Shelf filter - steep is per octave, so -12 dB for each frequency bin
 enable_hardware_profile: 0
 hardware_profile_steep_low: -24
@@ -79,5 +67,5 @@ enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
-simulation_slowdown: 4
+simulation_slowdown: 1
 max_simulation_iterations: 20

@@ -18,3 +18,7 @@ rm -rf armadillo-code
 
 # clean matlab
 rm -f matlab/*.wav matlab/eqs matlab/gain
+
+# clean saved files
+rm -rf save/white_noises/after/*
+rm -rf save/white_noises/before/*

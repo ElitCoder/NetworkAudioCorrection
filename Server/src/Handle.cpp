@@ -1508,6 +1508,17 @@ static vector<double> getSD(const vector<string>& files, size_t start, size_t st
 }
 #endif
 
+#if 0
+static void testFilter(FFTOutput& fft) {
+	double A = pow(10, 3.0 / 40);
+
+	for (size_t i = 0; i < fft.second.size(); i++) {
+		auto& s = fft.second.at(i);
+		s = (pow(s, 2) + s * (A / 1.0) + 1) / (pow(s, 2) + s / (A  * 1.0) + 1);
+	}
+}
+#endif
+
 void Handle::testing() {
 	#if 0
 	vector<string> speaker_ips = { "1" };
@@ -1606,10 +1617,24 @@ void Handle::testing() {
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
 		auto after_samples = plotFFTFile("after.wav", start, stop, false);
 
+#if 0
+		auto before_fft = nac::doFFT(before_samples, start, stop);
+		auto after_fft = before_fft;
+		testFilter(after_fft);
+#endif
+
 		vector<double> final_eq;
 
 		if (calc_eq)
 			final_eq = nac::findSimulatedEQSettings(before_samples, Base::system().getSpeakerProfile().getFilter(), start, stop);
+
+		if (Base::config().get<bool>("enable_customer_profile")) {
+			auto customer_eq = Base::config().getAll<double>("customer_profile");
+
+			for (size_t i = 0; i < final_eq.size(); i++) {
+				final_eq.at(i) += customer_eq.at(i);
+			}
+		}
 
 		cout << endl << endl;
 

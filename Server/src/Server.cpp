@@ -227,13 +227,20 @@ int main() {
 
 	vector<double> frequencies = Base::config().getAll<double>("dsp_eq"); //{ 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
 	double q = Base::config().get<double>("dsp_eq_q");
+	auto string_type = Base::config().get<string>("dsp_eq_type");
+	int type = 0;
+	if (string_type == "parametric") {
+		type = PARAMETRIC;
+	} else if (string_type == "graphic") {
+		type = BANDPASS;
+	}
 
 	speaker.setSpeakerEQ(frequencies, q);
 	speaker.setMaxEQ(Base::config().get<double>("dsp_eq_max"));
 	speaker.setMinEQ(Base::config().get<double>("dsp_eq_min"));
 
 	for (size_t i = 0; i < frequencies.size(); i++)
-		speaker.getFilter().addBand(lround(frequencies.at(i)), q);
+		speaker.getFilter().addBand(lround(frequencies.at(i)), q, type);
 
 	Base::system().setSpeakerProfile(speaker);
 	Base::system().setMicrophoneProfile(microphone);
