@@ -31,7 +31,7 @@ void FilterBank::Filter::reset(double gain, int fs) {
 
 		case BANDPASS:
 			A = pow(10, gain / 20);
-			alpha = sin(w0) * sinh(M_LN2 / 2 * Base::config().get<double>("dsp_eq_bw") * w0 / sin(w0));
+			alpha = sin(w0) * sinh(M_LN2 / 2 * (1.0 / Base::config().get<double>("dsp_eq_bw")) * w0 / sin(w0));
 			break;
 
 		default: cout << "ERROR: Filter type not specified";

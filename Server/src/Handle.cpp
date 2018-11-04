@@ -1452,6 +1452,9 @@ void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
 static vector<double> g_last_eq(9, 0);
 
 static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
+	if (stop > samples.size())
+		stop = samples.size();
+
 	vector<short> real(samples.begin() + start, samples.begin() + stop);
 
 	auto before = nac::doFFT(real);
@@ -1610,7 +1613,7 @@ void Handle::testing() {
 		file.close();
 		#endif
 
-		size_t start = lround(2 * 48000.0);
+		size_t start = lround(3 * 48000.0);
 		size_t stop = lround(30 * 48000.0);
 		bool calc_eq = true;
 

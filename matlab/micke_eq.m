@@ -18,12 +18,12 @@ N = 65536;
 [Py, fy] = pwelch(y, [], [], N, fsy);
 % [Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
 % [Py, fy] = pwelch(y, N, N / 2, 'twosided', 'power');
-% 
+%
 % Px = Px(1 : N / 2);
 % Py = Py(1 : N / 2);
 % fx = fx(1 : N / 2);
 % fy = fy(1 : N / 2);
-% 
+%
 % fx = fx * N;
 % fy = fy * N;
 
@@ -45,14 +45,14 @@ for i = 1:length(xLin)
 end
 
 for i = 2:length(xLog)-1
-   newPowPx(i) = mean(powPx(xLog(i-1):xLog(i+1))); 
+   newPowPx(i) = mean(powPx(xLog(i-1):xLog(i+1)));
 end
 
 fx = fx(xLog(2:length(xLog)));
 powPx = newPowPx;
 
 for i = 2:length(xLog)-1
-   newPowPy(i) = mean(powPy(xLog(i-1):xLog(i+1))); 
+   newPowPy(i) = mean(powPy(xLog(i-1):xLog(i+1)));
 end
 
 fy = fy(xLog(2:length(xLog)));
