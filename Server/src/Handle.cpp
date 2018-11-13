@@ -1449,7 +1449,7 @@ void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
 	*/
 }
 
-static vector<double> g_last_eq(9, 0);
+//static vector<double> g_last_eq(9, 0);
 
 static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 	if (stop > samples.size())
@@ -1461,11 +1461,13 @@ static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 	//before = nac::toDecibel(before);
 	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
 
+#if 0
 	for (size_t i = 0; i < g_last_eq.size(); i++)
 		cout << eq.at(i) - g_last_eq.at(i) << " ";
 	cout << endl;
 
 	g_last_eq = eq;
+#endif
 }
 
 static vector<short> plotFFTFile(const string& file, size_t start, size_t stop, bool plot = true) {

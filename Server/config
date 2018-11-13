@@ -49,6 +49,11 @@ dsp_eq_type: parametric
 #dsp_eq_bw: 1.0
 #dsp_eq_type: graphic
 
+#dsp_eq: 60 230 910 4000 14000
+#dsp_octave_width: 0.5
+#dsp_eq_bw: 0.5
+#dsp_eq_type: graphic
+
 dsp_eq_max: 24
 dsp_eq_min: -24
 enable_customer_profile: 0

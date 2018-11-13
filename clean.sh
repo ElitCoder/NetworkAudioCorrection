@@ -22,3 +22,6 @@ rm -f matlab/*.wav matlab/eqs matlab/gain
 # clean saved files
 rm -rf save/white_noises/after/*
 rm -rf save/white_noises/before/*
+
+# clean scripts tmp files
+rm -f scripts/*.wav
