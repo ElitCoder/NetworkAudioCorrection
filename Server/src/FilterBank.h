@@ -13,7 +13,8 @@ enum {
 class FilterBank {
 public:
 	void addBand(int frequency, double q, int type);
-	void apply(const std::vector<short>& samples, std::vector<short>& out, const std::vector<std::pair<int, double>>& gains, int fs);
+	void apply(const std::vector<short>& samples, std::vector<short>& out, const std::vector<std::pair<int, double>>& gains, int fs, bool write = false);
+	double gainAt(double frequency, double fs);
 
 private:
 	void initializeFiltering(const std::vector<short>& in, std::vector<double>& out, const std::vector<std::pair<int, double>>& gains, int fs);
@@ -31,6 +32,8 @@ private:
 
 		int getFrequency() const;
 		int getType() const;
+
+		double gainAt(double frequency, double fs);
 
 	private:
 		bool enabled_	= false;

@@ -35,7 +35,6 @@ timeout: 120
 # dsp_eq - centre frequencies
 # dsp_octave_width - divider for octave width, e.g 30-band EQ gives 1/3 -> 3
 # dsp_eq_q - constant Q factor (parametric EQ)
-# dsp_eq_bw - bandwidth in octaves (graphic EQ)
 
 # 9-band EQ (preset dspd)
 dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
@@ -46,12 +45,11 @@ dsp_eq_type: parametric
 # 10-band graphic EQ
 #dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
 #dsp_octave_width: 1
-#dsp_eq_bw: 1.0
 #dsp_eq_type: graphic
 
+# AudioFX 5-band graphic EQ
 #dsp_eq: 60 230 910 4000 14000
 #dsp_octave_width: 0.5
-#dsp_eq_bw: 0.5
 #dsp_eq_type: graphic
 
 dsp_eq_max: 24

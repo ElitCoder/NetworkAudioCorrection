@@ -1658,7 +1658,7 @@ void Handle::testing() {
 
 		cout << "Simulated:\n";
 		vector<short> simulated_samples;
-		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, pair_eq, 48000);
+		Base::system().getSpeakerProfile().getFilter().apply(before_samples, simulated_samples, pair_eq, 48000, true);
 		plotFFT(simulated_samples, start, stop);
 		cout << endl;
 

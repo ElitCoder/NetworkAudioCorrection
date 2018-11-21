@@ -16,24 +16,14 @@ y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
 N = 65536;
 [Px, fx] = pwelch(x, [], [], N, fsx);
 [Py, fy] = pwelch(y, [], [], N, fsy);
-% [Px, fx] = pwelch(x, N, N / 2, 'twosided', 'power');
-% [Py, fy] = pwelch(y, N, N / 2, 'twosided', 'power');
-%
-% Px = Px(1 : N / 2);
-% Py = Py(1 : N / 2);
-% fx = fx(1 : N / 2);
-% fy = fy(1 : N / 2);
-%
-% fx = fx * N;
-% fy = fy * N;
 
 % Smoothen pink noise by * f
 for i = 1:length(Px)
-    Px(i) = Px(i) * i;
+    Px(i) = Px(i) * fx(i);
 end
 
 for i = 1:length(Py)
-    Py(i) = Py(i) * i;
+    Py(i) = Py(i) * fy(i);
 end
 
 powPx = pow2db(Px);
@@ -58,21 +48,21 @@ end
 fy = fy(xLog(2:length(xLog)));
 powPy = newPowPy;
 
-all_index = find(fx >= 19 & fx <= 22721);
-fx = fx(all_index);
-fy = fy(all_index);
-powPx = powPx(all_index);
-powPy = powPy(all_index);
+all_index = find(fx >= 19 & fx <= 20500);
+% fx = fx(all_index);
+% fy = fy(all_index);
+% powPx = powPx(all_index);
+% powPy = powPy(all_index);
 
-min_total = min([min(powPx), min(powPy)]) - 3;
-max_total = max([max(powPx), max(powPy)]) + 3;
+min_total = min([min(powPx(all_index)), min(powPy(all_index))]) - 3;
+max_total = max([max(powPx(all_index)), max(powPy(all_index))]) + 3;
 
-%Adds a combined plot of both curves for comparing
+% Adds a combined plot of both curves for comparing
 both = subplot(1, 1, 1);
 plot(both, fx, powPx, 'r');
 hold on
 plot(both, fy, powPy, 'g');
-axis(both, [20, 22720, min_total, max_total]);
+axis(both, [20, 20000, min_total, max_total]);
 set(both, 'XScale', 'log');
 title(both, 'Combined');
 ylabel(both, 'dB');

@@ -41,7 +41,9 @@ static double calculateSD(const vector<double>& data) {
 	return sqrt(std / data.size());
 }
 
-static int getBandIndex(double frequency, const vector<double>& limits) {
+static vector<size_t> getBandIndex(double frequency, const vector<double>& limits) {
+	vector<size_t> indicies;
+
 	for (size_t i = 0; i < limits.size(); i += 2) {
 		auto low = limits.at(i);
 		auto high = limits.at(i + 1);
@@ -50,24 +52,22 @@ static int getBandIndex(double frequency, const vector<double>& limits) {
 			high = limits.at(i + 2);
 
 		if (frequency >= low && frequency < high)
-			return i / 2;
+			indicies.push_back(i / 2);
 	}
 
-	return -1;
+	return indicies;
 }
 
 static double correctMaxEQ(vector<double>& eq) {
-	//double total_mean_change = 0;
+	double total_mean_change = 0;
 	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
 	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
 
 	for (int i = 0; i < 1000; i++) {
-		#if 0
 		double mean_db = mean(eq);
 
-		for (auto& setting : eq)
-			setting -= mean_db;
-		#endif
+		//for (auto& setting : eq)
+		//	setting -= mean_db;
 		for (auto& setting : eq) {
 			if (setting < min_eq)
 				setting = min_eq;
@@ -75,21 +75,24 @@ static double correctMaxEQ(vector<double>& eq) {
 				setting = max_eq;
 		}
 
-		//total_mean_change += mean_db;
+		total_mean_change += mean_db;
 	}
 
-	return 0;//total_mean_change;
+	return total_mean_change;
 }
 
 static int findBestFFTSize(double fs, double band_width) {
 	// Start number
-	int N = 256;
+	int N = 48000;
 
 	while (fs / (double)N > band_width * 2)
 		N *= 2;
 
 	return N;
 }
+
+static int g_f_low = -1;
+static int g_f_high = -1;
 
 namespace nac {
 	FFTOutput doFFT(const vector<short>& samples, size_t start, size_t stop) {
@@ -214,6 +217,9 @@ namespace nac {
 	}
 
 	vector<double> findSimulatedEQSettings(const vector<short>& samples, FilterBank filter, size_t start, size_t stop) {
+		g_f_low = -1;
+		g_f_high = -1;
+
 		auto speaker_eq = Base::system().getSpeakerProfile().getSpeakerEQ();
 		auto& speaker_eq_frequencies = speaker_eq.first;
 
@@ -221,6 +227,8 @@ namespace nac {
 		vector<double> best_eq;
 		double best_score = INT_MAX;
 		double target_db = 0;
+
+		auto fft_output = nac::doFFT(samples, start, stop);
 
 		for (int i = 0; i < Base::config().get<int>("max_simulation_iterations"); i++) {
 			correctMaxEQ(eq_change);
@@ -236,13 +244,22 @@ namespace nac {
 			cout << endl;
 
 			vector<short> simulated_samples;
-			filter.apply(samples, simulated_samples, gains, 48000);
+			filter.apply(samples, simulated_samples, gains, 48000, true);
 
 			// Find basic EQ change
 			auto response = nac::doFFT(simulated_samples, start, stop);
+#if 0
+			filter.apply(samples, simulated_samples, gains, 48000);
+			auto response = fft_output;
+			response = nac::toDecibel(response);
 
+			for (size_t x = 1; x < response.first.size(); x++) {
+				response.second.at(x) += filter.gainAt(response.first.at(x), 48000);
+			}
+			response = nac::toLinear(response);
+#endif
 			cout << "Transformed to:\n";
-			auto peer = nac::fitBands(response, speaker_eq, false);
+			auto peer = nac::fitBands(response, speaker_eq, false, target_db == 0 ? -20000 : target_db);
 
 			if (Base::config().get<bool>("enable_hardware_profile")) {
 				response = nac::toDecibel(response);
@@ -256,7 +273,7 @@ namespace nac {
 				response = nac::toLinear(response);
 
 				cout << "After hardware profile:\n";
-				peer = nac::fitBands(response, speaker_eq, false);
+				peer = nac::fitBands(response, speaker_eq, false, target_db == 0 ? -20000 : target_db);
 			}
 
 			auto& negative_curve = peer.first;
@@ -302,7 +319,7 @@ namespace nac {
 		return best_eq;
 	}
 
-	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db) {
+	pair<vector<double>, double> fitBands(const FFTOutput& input, const pair<vector<double>, double>& eq_settings, bool input_db, double target_db) {
 		auto& eq_frequencies = eq_settings.first;
 
 		// Calculate band limits
@@ -330,34 +347,129 @@ namespace nac {
 		auto& frequencies = actual.first;
 		auto& dbs = actual.second;
 
+		auto new_db = actual.second;
+		for (size_t i = 0; i < dbs.size(); i++) {
+			new_db.at(i) = dbs.at(i) * frequencies.at(i);
+		}
+
+		double avg_energy = accumulate(new_db.begin(), new_db.end(), 0.0) / new_db.size();
+		double f_low = -1;
+		double f_high = -1;
+
+		avg_energy *= 2;
+
 		for (size_t i = 0; i < dbs.size(); i++) {
 			auto& frequency = frequencies.at(i);
+			auto& db = new_db.at(i);
+
+			if (frequency < 20)
+				continue;
+
+			if (frequency < 35)
+				cout << "energy " << frequency << " " << db << " avg " << avg_energy << endl;
+
+			if (db >= avg_energy) {
+				if (f_low < 0)
+					f_low = frequency;
+			}
+		}
+
+		for (int i = dbs.size() - 1; i > 0; i--) {
+			auto& frequency = frequencies.at(i);
+			auto& db = new_db.at(i);
+
+			if (frequency > 20000)
+				continue;
+
+			if (db >= avg_energy) {
+				if (f_high < 0)
+					f_high = frequency;
+			}
+		}
+
+		if (g_f_low < 0)
+			g_f_low = f_low;
+		else
+			f_low = g_f_low;
+		if (g_f_high < 0)
+			g_f_high = f_high;
+		else
+			f_high = g_f_high;
+		cout << "f_low " << f_low << " f_high " << f_high << endl;
+
+		for (size_t i = 0; i < dbs.size(); i++) {
+			auto& frequency = frequencies.at(i);
+
+			if (frequency < f_low || frequency > f_high)
+				continue;
+
 			auto index = getBandIndex(frequency, band_limits);
 
+			//cout << endl;
+			for (auto& j : index) {
+				energy.at(j) += dbs.at(i);
+				num.at(j)++;
+
+				//cout << "INDEX " << j << endl;
+			}
+			//cout << endl;
+
+#if 0
 			// This frequency is outside band range
-			if (index < 0)
+			if (index.empty())
 				continue;
+
 
 			energy.at(index) += dbs.at(i);
 			num.at(index)++;
+#endif
 		}
 
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
 
+		vector<int> mean_band;
+		double tot = 0;
+		int nums = 0;
+
 		for (size_t i = 0; i < num.size(); i++) {
+			auto low = band_limits.at(i * 2);
+			auto high = band_limits.at(i * 2 + 1);
 			if (Base::config().get<bool>("is_white_noise")) {
 				// Divide with the octave width
-				auto low = band_limits.at(i * 2);
-				auto high = band_limits.at(i * 2 + 1);
 
 				energy.at(i) /= (high - low);
+			} else {
+				if ((low < f_low && high < f_low) || (high > f_high && low > f_high)) {
+					// Set to mean later to avoid boosting
+					if (target_db > -10000)
+						energy.at(i) = target_db;
+					else
+						mean_band.push_back(i);
+					continue;
+				}
+				if (low < f_low && high > f_low) {
+					energy.at(i) *= (high - low) / (high - f_low);
+				}
+
+				if (high > f_high && low < f_high) {
+					energy.at(i) *= (high - low) / (f_high - low);
+				}
 			}
 
 			// Convert to dB
 			if (!input_db)
 				energy.at(i) = 10 * log10(energy.at(i));
 
+			tot += energy.at(i);
+			nums++;
+
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
+		}
+
+		if (!mean_band.empty()) {
+			for (auto mean : mean_band) {
+				energy.at(mean) = tot / nums;
+			}
 		}
 
 		auto db_std_dev = calculateSD(energy);

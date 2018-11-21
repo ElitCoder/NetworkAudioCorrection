@@ -31,7 +31,7 @@ void FilterBank::Filter::reset(double gain, int fs) {
 
 		case BANDPASS:
 			A = pow(10, gain / 20);
-			alpha = sin(w0) * sinh(M_LN2 / 2 * (1.0 / Base::config().get<double>("dsp_eq_bw")) * w0 / sin(w0));
+			alpha = sin(w0) * sinh(M_LN2 / 2 * (1.0 / Base::config().get<double>("dsp_octave_width")) * w0 / sin(w0));
 			break;
 
 		default: cout << "ERROR: Filter type not specified";
@@ -144,14 +144,20 @@ void FilterBank::finalizeFiltering(const vector<double>& in, vector<short>& out)
 		out.push_back(lround(sample * (double)SHRT_MAX));
 }
 
-void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, int fs) {
+void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, int fs, bool write) {
 	vector<double> normalized;
 	initializeFiltering(samples, normalized, gains, fs);
+
+	if (!write)
+		return;
 
 	/* Clear outgoing buffer */
 	out.clear();
 
 	/* All filters are of the same type */
+	if (filters_.empty())
+		cout << "WARNING: Empty filter vector\n";
+
 	auto type = filters_.front().getType();
 
 	if (type == PARAMETRIC) {
@@ -187,4 +193,38 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 	}
 
 	finalizeFiltering(normalized, out);
+}
+
+double FilterBank::gainAt(double frequency, double fs) {
+	double sum = 0;
+
+	// Sum gainAt() for all filters
+	for (auto& filter : filters_) {
+		double db = filter.gainAt(frequency, fs);
+		//double linear = pow(10, db / 10);
+
+		//cout << "freq " << frequency << " db " << db << endl;
+
+		sum += db;
+	}
+
+	//sum = 10 * log10(sum);
+	return sum;
+}
+
+double FilterBank::Filter::gainAt(double frequency, double fs) {
+	double omega = 2 * M_PI * frequency / fs;
+	double sn = sin(omega / 2.0);
+	double phi = sn * sn;
+	double b0 = b_[0];
+	double b1 = b_[1];
+	double b2 = b_[2];
+	double a0 = a_[0];
+	double a1 = a_[1];
+	double a2 = a_[2];
+
+	double dbGain = 10 * log10(pow(b0 + b1 + b2, 2) - 4 * (b0 * b1 + 4 * b0 * b2 + b1 * b2) * phi + 16 * b0 * b2 * phi * phi)
+		- 10 * log10(pow(a0 + a1 + a2, 2) - 4 * (a0 * a1 + 4 * a0 * a2 + a1 * a2) * phi + 16 * a0 * a2 * phi * phi);
+
+	return dbGain;
 }
