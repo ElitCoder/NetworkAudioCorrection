@@ -66,8 +66,19 @@ static double correctMaxEQ(vector<double>& eq) {
 	for (int i = 0; i < 1000; i++) {
 		double mean_db = mean(eq);
 
-		//for (auto& setting : eq)
-		//	setting -= mean_db;
+		if (Base::config().get<bool>("normalize_spectrum")) {
+			for (auto& setting : eq)
+				setting -= mean_db;
+		}
+
+		if (Base::config().get<bool>("boost_max_zero")) {
+			/* Move below 0 */
+			auto max = *max_element(eq.begin(), eq.end());
+
+			for (auto& setting : eq)
+				setting -= max;
+		}
+
 		for (auto& setting : eq) {
 			if (setting < min_eq)
 				setting = min_eq;
@@ -83,7 +94,7 @@ static double correctMaxEQ(vector<double>& eq) {
 
 static int findBestFFTSize(double fs, double band_width) {
 	// Start number
-	int N = 48000;
+	int N = 65536;
 
 	while (fs / (double)N > band_width * 2)
 		N *= 2;
@@ -283,7 +294,7 @@ namespace nac {
 			vector<double> eq;
 
 			/* Set target_db to mean if it's the first run */
-			if (i == 0) {
+			if (i == 0 || Base::config().get<bool>("boost_max_zero")) {
 				target_db = mean(negative_curve);
 				cout << "Setting target DB to " << target_db << endl;
 			}
@@ -356,7 +367,10 @@ namespace nac {
 		double f_low = -1;
 		double f_high = -1;
 
-		avg_energy *= 2;
+		if (Base::config().get<bool>("ignore_speaker_limitations"))
+			avg_energy = 0;
+		else
+			avg_energy *= 2;
 
 		for (size_t i = 0; i < dbs.size(); i++) {
 			auto& frequency = frequencies.at(i);

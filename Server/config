@@ -72,3 +72,9 @@ simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
 simulation_slowdown: 1
 max_simulation_iterations: 20
+# Only attenuate
+boost_max_zero: 0
+# Mean spectrum gain
+normalize_spectrum: 1
+# Ignore speaker limitations
+ignore_speaker_limitations: 0
