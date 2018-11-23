@@ -401,6 +401,9 @@ namespace nac {
 			}
 		}
 
+		f_low = f_low < Base::config().get<double>("frequency_range_low") ? Base::config().get<double>("frequency_range_low") : f_low;
+		f_high = f_high > Base::config().get<double>("frequency_range_high") ? Base::config().get<double>("frequency_range_high") : f_high;
+
 		if (g_f_low < 0)
 			g_f_low = f_low;
 		else
