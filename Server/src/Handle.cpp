@@ -1470,9 +1470,14 @@ static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
 #endif
 }
 
-static vector<short> plotFFTFile(const string& file, size_t start, size_t stop, bool plot = true) {
+static vector<short> plotFFTFile(const string& file, size_t& start, size_t& stop, bool plot = true) {
 	vector<short> samples;
 	WavReader::read(file, samples);
+
+	if (stop > samples.size()) {
+		start = 0;
+		stop = samples.size();
+	}
 
 	if (plot)
 		plotFFT(samples, start, stop);
@@ -1620,7 +1625,7 @@ void Handle::testing() {
 		bool calc_eq = true;
 
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
-		auto after_samples = plotFFTFile("after.wav", start, stop, false);
+		//auto after_samples = plotFFTFile("after.wav", start, stop, false);
 
 #if 0
 		auto before_fft = nac::doFFT(before_samples, start, stop);
@@ -1647,10 +1652,11 @@ void Handle::testing() {
 		plotFFT(before_samples, start, stop);
 		cout << endl;
 
+#if 0
 		cout << "After:\n";
 		plotFFT(after_samples, start, stop);
 		cout << endl;
-
+#endif
 		vector<pair<int, double>> pair_eq;
 
 		for (size_t i = 0; i < Base::system().getSpeakerProfile().getSpeakerEQ().first.size(); i++)
@@ -1688,7 +1694,7 @@ void Handle::testing() {
 			cout << endl;
 			cout << endl;
 
-			WavReader::write("simulated_after.wav", simulated_samples, "after.wav");
+			WavReader::write("simulated_after.wav", simulated_samples, "before.wav");
 		}
 
 		cout << endl;
