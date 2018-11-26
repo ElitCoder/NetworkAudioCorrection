@@ -18,8 +18,8 @@ if sound_stop_sec > length(x)
 end
 
 % cut silence
-x = x(fsx * sound_start_sec : fsx * sound_stop_sec);
-y = y(fsy * sound_start_sec : fsy * sound_stop_sec);
+x = x(sound_start_sec : sound_stop_sec);
+y = y(sound_start_sec : sound_stop_sec);
 
 % create spectrum
 N = 65536;

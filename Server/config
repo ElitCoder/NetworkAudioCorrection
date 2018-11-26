@@ -75,9 +75,11 @@ max_simulation_iterations: 20
 # Only attenuate
 boost_max_zero: 0
 # Mean spectrum gain
-normalize_spectrum: 1
+normalize_spectrum: 0
 # Ignore speaker limitations
 ignore_speaker_limitations: 0
 # Valid frequency range (where should we optimize)
 frequency_range_low: 20
 frequency_range_high: 20000
+# Auto-find speaker range (if not forced with ignore)
+speaker_limitations_factor: 1

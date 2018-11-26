@@ -370,7 +370,7 @@ namespace nac {
 		if (Base::config().get<bool>("ignore_speaker_limitations"))
 			avg_energy = 0;
 		else
-			avg_energy *= 2;
+			avg_energy *= Base::config().get<double>("speaker_limitations_factor");
 
 		for (size_t i = 0; i < dbs.size(); i++) {
 			auto& frequency = frequencies.at(i);
