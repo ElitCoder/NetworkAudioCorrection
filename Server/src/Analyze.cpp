@@ -465,10 +465,24 @@ namespace nac {
 					continue;
 				}
 				if (low < f_low && high > f_low) {
+					if (high - f_low < 5) {
+						if (target_db > -10000)
+							energy.at(i) = target_db;
+						else
+							mean_band.push_back(i);
+						continue;
+					}
 					energy.at(i) *= (high - low) / (high - f_low);
 				}
 
 				if (high > f_high && low < f_high) {
+					if (f_high - low < 5) {
+						if (target_db > -10000)
+							energy.at(i) = target_db;
+						else
+							mean_band.push_back(i);
+						continue;
+					}
 					energy.at(i) *= (high - low) / (f_high - low);
 				}
 			}
