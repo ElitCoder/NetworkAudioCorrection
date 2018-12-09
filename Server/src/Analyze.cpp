@@ -159,6 +159,52 @@ namespace nac {
 		return { frequencies, difference };
 	}
 
+	FFTOutput applyShelving(const FFTOutput& input) {
+		double low_freq = Base::config().get<double>("low_shelf_freq");
+		double low_gain = Base::config().get<double>("low_shelf_gain");
+		double high_freq = Base::config().get<double>("high_shelf_freq");
+		double high_gain = Base::config().get<double>("high_shelf_gain");
+
+		/* Apply shelving filters as y = kx + m to peak gain */
+		double low_cutoff = low_freq - low_freq * 0.5;
+		double high_cutoff = high_freq + high_freq * 0.5;
+
+		/* Add curve to peak */
+		FFTOutput output = input;
+		auto& freqs = output.first;
+		auto& dbs = output.second;
+
+		for (size_t i = 0; i < freqs.size(); i++) {
+			auto& freq = freqs.at(i);
+			auto& db = dbs.at(i);
+
+			if (freq < low_cutoff) {
+				/* If we're below cutoff, apply full gain */
+				db -= low_gain;
+			} else if (freq >= low_cutoff && freq < low_freq) {
+				/* Apply kx + m */
+				double k = low_gain / (low_cutoff - low_freq);
+				double m = -(low_gain / (low_cutoff - low_freq)) * low_freq;
+
+				double y = k * freq + m;
+				db -= y;
+			}
+
+			if (freq > high_cutoff) {
+				db -= high_gain;
+			} else if (freq <= high_cutoff && freq > high_freq) {
+				/* Apply kx + m */
+				double k = high_gain / (high_cutoff - high_freq);
+				double m = -(high_gain / (high_cutoff - high_freq)) * high_freq;
+
+				double y = k * freq + m;
+				db -= y;
+			}
+		}
+
+		return output;
+	}
+
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
 		auto low = max(speaker_profile.getLowCutOff(), microphone_profile.getLowCutOff());
 		auto high = min(speaker_profile.getHighCutOff(), microphone_profile.getHighCutOff());
@@ -272,18 +318,36 @@ namespace nac {
 			cout << "Transformed to:\n";
 			auto peer = nac::fitBands(response, speaker_eq, false, target_db == 0 ? -20000 : target_db);
 
-			if (Base::config().get<bool>("enable_hardware_profile")) {
-				response = nac::toDecibel(response);
+			bool hardware_profile = Base::config().get<bool>("enable_hardware_profile");
+			bool shelving_filters = Base::config().get<bool>("enable_shelving_filters");
 
+			if (hardware_profile || shelving_filters) {
+				/* Convert to dB */
+				response = nac::toDecibel(response);
+			}
+
+			if (hardware_profile) {
 				auto speaker_profile = Base::system().getSpeakerProfile().invert();
 				auto mic_profile = Base::system().getMicrophoneProfile().invert();
 
-				response = nac::applyProfiles(response, speaker_profile, mic_profile);
+				/* Imitate loudness curve */
+				if (Base::config().get<bool>("hardware_profile_invert")) {
+					speaker_profile = Base::system().getSpeakerProfile();
+					mic_profile = Base::system().getMicrophoneProfile();
+				}
 
-				// Revert back to energy
+				response = nac::applyProfiles(response, speaker_profile, mic_profile);
+			}
+
+			if (shelving_filters) {
+				response = nac::applyShelving(response);
+			}
+
+			if (hardware_profile || shelving_filters) {
+				/* Convert back to linear */
 				response = nac::toLinear(response);
 
-				cout << "After hardware profile:\n";
+				cout << "After target curve manipulations:\n";
 				peer = nac::fitBands(response, speaker_eq, false, target_db == 0 ? -20000 : target_db);
 			}
 
@@ -294,7 +358,7 @@ namespace nac {
 			vector<double> eq;
 
 			/* Set target_db to mean if it's the first run */
-			if (i == 0 || Base::config().get<bool>("boost_max_zero")) {
+			if (i == 0/* || Base::config().get<bool>("boost_max_zero")*/) {
 				target_db = mean(negative_curve);
 				cout << "Setting target DB to " << target_db << endl;
 			}
@@ -401,8 +465,10 @@ namespace nac {
 			}
 		}
 
-		f_low = f_low < Base::config().get<double>("frequency_range_low") ? Base::config().get<double>("frequency_range_low") : f_low;
-		f_high = f_high > Base::config().get<double>("frequency_range_high") ? Base::config().get<double>("frequency_range_high") : f_high;
+		if (Base::config().get<bool>("ignore_speaker_limitations")) {
+			f_low = f_low < Base::config().get<double>("frequency_range_low") ? Base::config().get<double>("frequency_range_low") : f_low;
+			f_high = f_high > Base::config().get<double>("frequency_range_high") ? Base::config().get<double>("frequency_range_high") : f_high;
+		}
 
 		if (g_f_low < 0)
 			g_f_low = f_low;

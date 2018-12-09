@@ -5,7 +5,7 @@ CC_FLAGS	:= -std=c++14 -Wall -Wextra -pedantic-errors
 CC_FLAGS	+= -g
 CC_FLAGS	+= -O3
 CC_FLAGS	+= -fopenmp -Dunix
-LD_LIBS		:= -fopenmp -lnessh -lcurl -lcurlpp -lpthread -larmadillo
+LD_LIBS		:= -fopenmp -lnessh -lcurl -lcurlpp -lpthread -larmadillo -lfftw3f -lfftw3f_threads
 
 EXECUTABLE	:= Server
 
