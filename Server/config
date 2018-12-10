@@ -59,6 +59,8 @@ dsp_eq_type: parametric
 
 dsp_eq_max: 24
 dsp_eq_min: -24
+# Only allow EQ values of multiple of 2 such as 0, 2, 4 and so on
+dsp_eq_mult_two: 0
 enable_customer_profile: 0
 customer_profile: 4 4 1 0 0 0 0 0 0 0
 # Shelf filter - steep is per octave, so -12 dB for each frequency bin
@@ -72,10 +74,10 @@ hardware_profile_cutoff_high: 7000
 hardware_profile_invert: 1
 # Basic EQ shelving filters in target curve
 enable_shelving_filters: 0
-low_shelf_freq: 200
-low_shelf_gain: 5
-high_shelf_freq: 4000
-high_shelf_gain: 0
+low_shelf_freq: 240
+low_shelf_gain: 6
+high_shelf_freq: 1666
+high_shelf_gain: 6
 # Which level the DSP will set when testing white noise
 calibration_safe_gain: 0
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables

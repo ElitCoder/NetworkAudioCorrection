@@ -102,6 +102,14 @@ static int findBestFFTSize(double fs, double band_width) {
 	return N;
 }
 
+/* From SO */
+int RoundToMultiple(double toRound, int multiple)
+{
+    const auto ratio = toRound / multiple;
+    const auto iratio = std::lround(ratio);
+    return iratio * multiple;
+}
+
 static int g_f_low = -1;
 static int g_f_high = -1;
 
@@ -166,8 +174,8 @@ namespace nac {
 		double high_gain = Base::config().get<double>("high_shelf_gain");
 
 		/* Apply shelving filters as y = kx + m to peak gain */
-		double low_cutoff = low_freq - low_freq * 0.5;
-		double high_cutoff = high_freq + high_freq * 0.5;
+		double low_cutoff = low_freq * 0.25;
+		double high_cutoff = high_freq * 4;
 
 		/* Add curve to peak */
 		FFTOutput output = input;
@@ -294,9 +302,14 @@ namespace nac {
 
 			cout << "Trying EQ: ";
 			for (size_t i = 0; i < speaker_eq_frequencies.size(); i++) {
-				gains.push_back({ speaker_eq_frequencies.at(i), eq_change.at(i) });
+				double actual_change = eq_change.at(i);
 
-				cout << eq_change.at(i) << " ";
+				if (Base::config().get<bool>("dsp_eq_mult_two")) {
+					actual_change = RoundToMultiple(actual_change, 2);
+				}
+
+				gains.push_back({ speaker_eq_frequencies.at(i), actual_change });
+				cout << actual_change << " ";
 			}
 			cout << endl;
 
@@ -370,8 +383,18 @@ namespace nac {
 			}
 
 			if (db_std_dev < best_score) {
+				/* Round to multiple of 2 if enabled */
+				if (Base::config().get<bool>("dsp_eq_mult_two")) {
+					best_eq.clear();
+
+					for (auto& value : eq_change) {
+						best_eq.push_back(RoundToMultiple(value, 2));
+					}
+				} else {
+					best_eq = eq_change;
+				}
+
 				best_score = db_std_dev;
-				best_eq = eq_change;
 			}
 
 			if (!best_eq.empty()) {
