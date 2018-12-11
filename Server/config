@@ -68,8 +68,10 @@ enable_hardware_profile: 0
 # 25 Hz - 18 dB, 200 Hz - 0 dB, 7000 Hz - 0 dB, 14000 Hz - 6 dB
 hardware_profile_steep_low: -6
 hardware_profile_steep_high: -6
-hardware_profile_cutoff_low: 200
-hardware_profile_cutoff_high: 7000
+hardware_profile_cutoff_low: 225
+hardware_profile_cutoff_low_min_freq: 20
+hardware_profile_cutoff_high: 5000
+hardware_profile_cutoff_high_max_freq: 10000
 # Invert for loudness curve?
 hardware_profile_invert: 1
 # Basic EQ shelving filters in target curve

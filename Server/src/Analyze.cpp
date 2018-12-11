@@ -218,6 +218,8 @@ namespace nac {
 		auto high = min(speaker_profile.getHighCutOff(), microphone_profile.getHighCutOff());
 		auto steep_low = max(speaker_profile.getSteepLow(), microphone_profile.getSteepLow());
 		auto steep_high = max(speaker_profile.getSteepHigh(), microphone_profile.getSteepHigh());
+		double lowest = Base::config().get<double>("hardware_profile_cutoff_low_min_freq");
+		double highest = Base::config().get<double>("hardware_profile_cutoff_high_max_freq");
 
 		//cout << "low " << low << endl;
 		//cout << "high " << high << endl;
@@ -238,18 +240,24 @@ namespace nac {
 
 			// How steep should this be?
 			if (frequency < low) {
-				//cout << "Attenuating frequency " << frequency << endl;
-
 				double steps = log2(low / frequency);
+
+				/* Boost with same value as lowest below lowest */
+				if (frequency < lowest) {
+					steps = log2(low / lowest);
+				}
+
 				double attenuation = steps * steep_low;
-
 				db += attenuation;
-
-				//cout << "With " << attenuation << " since steps is " << steps << endl;
 			} else if (frequency > high) {
 				double steps = log2(frequency / high);
-				double attenuation = steps * steep_high;
 
+				/* Boost with same value as highest above highest */
+				if (frequency > highest) {
+					steps = log2(highest / high);
+				}
+
+				double attenuation = steps * steep_high;
 				db += attenuation;
 			}
 		}
