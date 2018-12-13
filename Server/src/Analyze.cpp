@@ -110,6 +110,32 @@ int RoundToMultiple(double toRound, int multiple)
     return iratio * multiple;
 }
 
+/* From SO */
+double interpolate( vector<double> &xData, vector<double> &yData, double x, bool extrapolate )
+{
+	int size = xData.size();
+
+	int i = 0;                                                                  // find left end of interval for interpolation
+	if ( x >= xData[size - 2] )                                                 // special case: beyond right end
+	{
+		i = size - 2;
+	}
+	else
+	{
+		while ( x > xData[i+1] ) i++;
+	}
+	double xL = xData[i], yL = yData[i], xR = xData[i+1], yR = yData[i+1];      // points on either side (unless beyond ends)
+	if ( !extrapolate )                                                         // if beyond ends of array and not extrapolating
+	{
+		if ( x < xL ) yR = yL;
+		if ( x > xR ) yL = yR;
+	}
+
+	double dydx = ( yR - yL ) / ( xR - xL );                                    // gradient
+
+	return yL + dydx * ( x - xL );                                              // linear interpolation
+}
+
 static int g_f_low = -1;
 static int g_f_high = -1;
 
@@ -209,6 +235,40 @@ namespace nac {
 				db -= y;
 			}
 		}
+
+		return output;
+	}
+
+	FFTOutput applyLoudness(const FFTOutput& input, double spl) {
+		const double f[] = { 20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500 };
+		const double af[] = { 0.532,0.506,0.480,0.455,0.432,0.409,0.387,0.367,0.349,0.330,0.315,0.301,0.288,0.276,0.267,0.259,0.253,0.250,0.246,0.244,0.243,0.243,0.243,0.242,0.242,0.245,0.254,0.271,0.301 };
+		const double Lu[] = { -31.6,-27.2,-23.0,-19.1,-15.9,-13.0,-10.3,-8.1,-6.2,-4.5,-3.1,-2.0,-1.1,-0.4,0.0,0.3,0.5,0.0,-2.7,-4.1,-1.0,1.7,2.5,1.2,-2.1,-7.1,-11.2,-10.7,-3.1 };
+		const double Tf[] = { 78.5,68.7,59.5,51.1,44.0,37.5,31.5,26.5,22.1,17.9,14.4,11.4,8.6,6.2,4.4,3.0,2.2,2.4,3.5,1.7,-1.3,-4.2,-6.0,-5.4,-1.5,6.0,12.6,13.9,12.3 };
+
+		double Ln = spl;
+		vector<double> freqs;
+
+		for (size_t i = 0; i < sizeof(f) / sizeof(double); i++) {
+			double Af = 4.47e-3 * (pow(10.0, 0.025 * Ln) - 1.15) +
+						pow(0.4 * pow(10.0, (((Tf[i]+Lu[i])/10)-9)), af[i]);
+			double Lp = (10 / af[i]) * log10(Af) - Lu[i] + 94;
+
+			/* Remove offset */
+			Lp -= spl;
+			Lp = -Lp;
+
+			freqs.push_back(Lp);
+		}
+
+		/* Interpolate */
+		FFTOutput output = input;
+		auto& o_freqs = output.first;
+		auto& dbs = output.second;
+
+		vector<double> l_freqs(f, f + sizeof(f) / sizeof(double));
+
+		for (size_t i = 0; i < o_freqs.size(); i++)
+			dbs.at(i) += interpolate(l_freqs, freqs, o_freqs.at(i), false);
 
 		return output;
 	}
@@ -341,8 +401,9 @@ namespace nac {
 
 			bool hardware_profile = Base::config().get<bool>("enable_hardware_profile");
 			bool shelving_filters = Base::config().get<bool>("enable_shelving_filters");
+			bool loudness = Base::config().get<bool>("enable_loudness_curve");
 
-			if (hardware_profile || shelving_filters) {
+			if (hardware_profile || shelving_filters || loudness) {
 				/* Convert to dB */
 				response = nac::toDecibel(response);
 			}
@@ -364,7 +425,12 @@ namespace nac {
 				response = nac::applyShelving(response);
 			}
 
-			if (hardware_profile || shelving_filters) {
+			if (loudness) {
+				double spl = Base::config().get<double>("loudness_curve_spl");
+				response = nac::applyLoudness(response, spl);
+			}
+
+			if (hardware_profile || shelving_filters || loudness) {
 				/* Convert back to linear */
 				response = nac::toLinear(response);
 

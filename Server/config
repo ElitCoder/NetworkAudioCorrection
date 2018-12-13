@@ -74,6 +74,9 @@ hardware_profile_cutoff_high: 5000
 hardware_profile_cutoff_high_max_freq: 10000
 # Invert for loudness curve?
 hardware_profile_invert: 1
+# Equal loudness contours
+enable_loudness_curve: 0
+loudness_curve_spl: 75
 # Basic EQ shelving filters in target curve
 enable_shelving_filters: 0
 low_shelf_freq: 240
