@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 #include "GainIterator.h"
 
@@ -31,8 +32,50 @@ GainIterator::GainIterator(const vector<FilterNode>& nodes)
 	nodeRight = NULL;
 }
 
+static double gainForBand(double band_freq, double freq, double bw, double gain)
+{
+	double lower_limit = band_freq * pow(2, -2 / bw);
+	double upper_limit = band_freq * pow(2, 2 / bw);
+
+	//gain = gain * 0.8;
+
+	if ((freq > 200 && freq < 250) || (freq > 1000 && freq < 1050))
+		cout << "upper " << upper_limit << " lower " << lower_limit << " freq " << freq << " band_freq " << band_freq << " gain " << gain << endl;
+
+	if (freq < lower_limit || freq > upper_limit)
+		return 0;
+
+	if (freq < band_freq) {
+		double k = gain / (band_freq - lower_limit);
+		double m = -(gain / (band_freq - lower_limit)) * lower_limit;
+
+		return k * freq + m;
+	} else if (freq == band_freq) {
+		return gain;
+	} else {
+		double k = gain / (band_freq - upper_limit);
+		double m = -(gain / (band_freq - upper_limit)) * upper_limit;
+
+		return k * freq + m;
+	}
+}
+
 double GainIterator::gainAt(double freq)
 {
+	double sum = 0;
+
+	for (auto& node : nodes) {
+		double gain = gainForBand(node.freq, freq, 1, node.dbGain);
+
+		sum += gain;
+	}
+
+	if ((freq > 200 && freq < 250) || (freq > 1000 && freq < 1050))
+		cout << "freq " << freq << " gain " << sum << endl;
+
+	return sum;
+
+#if 0
 	if ((nodeLeft == NULL && nodeRight == NULL) || (nodeLeft != NULL && freq < nodeLeft->freq))
 	{
 		FilterNode findNode(freq, 0);
@@ -93,4 +136,5 @@ double GainIterator::gainAt(double freq)
 	}
 
 	return dbGain;
+#endif
 }

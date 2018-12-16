@@ -29,7 +29,7 @@ void FilterBank::Filter::reset(double gain, int fs) {
 	switch (type_) {
 		case PARAMETRIC:
 			A = pow(10, gain / 40);
-			alpha = sin(w0) / (2 * A * q_);
+			alpha = sin(w0) / (2 * q_);
 			break;
 
 		case BANDPASS:
@@ -52,20 +52,19 @@ void FilterBank::Filter::reset(double gain, int fs) {
 		a0 = 1 + alpha;
 		a1 = -2 * cos(w0);
 		a2 = 1 - alpha;
-		b0 = alpha;
+		b0 = A * alpha;
 		b1 = 0;
-		b2 = -alpha;
+		b2 = A * -alpha;
 	}
 
 	a_.clear();
 	b_.clear();
 
-	a_.push_back(a0);
-	a_.push_back(a1);
-	a_.push_back(a2);
-	b_.push_back(b0);
-	b_.push_back(b1);
-	b_.push_back(b2);
+	a_.push_back(b0 / a0);
+	b_.push_back(b1 / a0);
+	b_.push_back(b2 / a0);
+	b_.push_back(a1 / a0);
+	b_.push_back(a2 / a0);
 }
 
 void FilterBank::Filter::process(const vector<double>& in, vector<double>& out) {
@@ -74,34 +73,21 @@ void FilterBank::Filter::process(const vector<double>& in, vector<double>& out) 
 
 	out.clear();
 
-	for (size_t i = 0; i < in.size(); i++) {
-		double x_0, x_1, x_2;
-		double y_1, y_2;
+	double x1 = 0;
+	double x2 = 0;
+	double y1 = 0;
+	double y2 = 0;
 
-		x_0 = in[i];
+	for (auto& sample : in) {
+		double result = a_.front() * sample + b_.at(1) * x2 + b_.at(0) * x1 - b_.at(3) * y2 - b_.at(2) * y1;
 
-		if (i < 2) {
-			x_2 = 0;
-			y_2 = 0;
+		x2 = x1;
+		x1 = sample;
 
-			if (i < 1) {
-				x_1 = 0;
-				y_1 = 0;
-			} else {
-				x_1 = in[i - 1];
-				y_1 = out[i - 1];
-			}
-		} else {
-			x_1 = in[i - 1];
-			x_2 = in[i - 2];
-			y_1 = out[i - 1];
-			y_2 = out[i - 2];
-		}
+		y2 = y1;
+		y1 = result;
 
-		double y = (b_[0] / a_[0]) * x_0 + (b_[1] / a_[0]) * x_1 + (b_[2] / a_[0]) * x_2
-										 - (a_[1] / a_[0]) * y_1 - (a_[2] / a_[0]) * y_2;
-
-		out.push_back(y);
+		out.push_back(result);
 	}
 }
 
@@ -550,27 +536,6 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 
 		delete[] inputChannel;
 		delete[] outputChannel;
-
-#if 0
-		float* inputChannel = new float[16384];
-		float* outputChannel = new float[16384];
-
-		for (size_t i = 0; i < normalized.size() - filterLength; i += filterLength) {
-			for (size_t j = i; j < i + filterLength; j++) {
-				inputChannel[j - i] = normalized.at(i);
-			}
-			hcPutSingle(filter, inputChannel);
-			hcProcessSingle(filter);
-			hcGetSingle(filter, outputChannel);
-			/* Copy output to normalized */
-			for (size_t j = 0; j < filterLength; j++) {
-				normalized.at(i + j) = outputChannel[j];
-			}
-		}
-
-		delete[] inputChannel;
-		delete[] outputChannel;
-#endif
 #endif
 		/* Apply filters in parallel */
 		vector<vector<double>> out_samples(filters_.size(), vector<double>());
@@ -585,13 +550,10 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 
 		for (size_t j = 0; j < out_samples.size(); j++) {
 			auto& filtered = out_samples.at(j);
-			auto gain = gains.at(j).second;
-
-			double linear_gain = pow(10.0, ((gain - 3.0) / 20.0));
 
 			#pragma omp parallel for
 			for (size_t i = 0; i < normalized.size(); i++) {
-				normalized.at(i) += linear_gain * filtered.at(i);
+				normalized.at(i) += filtered.at(i);
 			}
 		}
 	}

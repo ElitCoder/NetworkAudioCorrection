@@ -38,6 +38,11 @@ end
 powPx = pow2db(Px);
 powPy = pow2db(Py);
 
+% Plot difference between before and after
+% powChange = powPy - powPx;
+% powPx = powChange;
+% powPy = powChange;
+
 xLin = 0:0.015:log10(length(fx));
 for i = 1:length(xLin)
     xLog(i) = round(10^xLin(i));
