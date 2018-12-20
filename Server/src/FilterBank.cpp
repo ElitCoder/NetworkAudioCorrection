@@ -584,12 +584,12 @@ double FilterBank::Filter::gainAt(double frequency, double fs) {
 	double omega = 2 * M_PI * frequency / fs;
 	double sn = sin(omega / 2.0);
 	double phi = sn * sn;
-	double b0 = b_[0];
-	double b1 = b_[1];
-	double b2 = b_[2];
-	double a0 = a_[0];
-	double a1 = a_[1];
-	double a2 = a_[2];
+	double b0 = a_.front();
+	double b1 = b_.front();
+	double b2 = b_.at(1);
+	double a0 = 1.0;
+	double a1 = b_.at(2);
+	double a2 = b_.at(3);
 
 	double dbGain = 10 * log10(pow(b0 + b1 + b2, 2) - 4 * (b0 * b1 + 4 * b0 * b2 + b1 * b2) * phi + 16 * b0 * b2 * phi * phi)
 		- 10 * log10(pow(a0 + a1 + a2, 2) - 4 * (a0 * a1 + 4 * a0 * a2 + a1 * a2) * phi + 16 * a0 * a2 * phi * phi);

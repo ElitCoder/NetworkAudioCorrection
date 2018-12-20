@@ -12,6 +12,7 @@
 
 #include <vector>
 #include <iostream>
+#include <set>
 
 using namespace std;
 
@@ -58,10 +59,14 @@ static vector<size_t> getBandIndex(double frequency, const vector<double>& limit
 	return indicies;
 }
 
+static set<int> g_ignore_bands;
+
 static double correctMaxEQ(vector<double>& eq) {
 	double total_mean_change = 0;
 	auto min_eq = Base::system().getSpeakerProfile().getMinEQ();
 	auto max_eq = Base::system().getSpeakerProfile().getMaxEQ();
+	auto speaker_eq = Base::system().getSpeakerProfile().getSpeakerEQ();
+	auto& speaker_eq_frequencies = speaker_eq.first;
 
 	for (int i = 0; i < 1000; i++) {
 		double mean_db = mean(eq);
@@ -75,8 +80,19 @@ static double correctMaxEQ(vector<double>& eq) {
 			/* Move below 0 */
 			auto max = *max_element(eq.begin(), eq.end());
 
+			for (size_t j = 0; j < eq.size(); j++) {
+				/* Ignore if it's in g_ignore_bands */
+				if (g_ignore_bands.count(lround(speaker_eq_frequencies.at(j)))) {
+					continue;
+				}
+
+				eq.at(j) -= max;
+			}
+
+#if 0
 			for (auto& setting : eq)
 				setting -= max;
+#endif
 		}
 
 		for (auto& setting : eq) {
@@ -382,20 +398,24 @@ namespace nac {
 			cout << endl;
 
 			vector<short> simulated_samples;
-			filter.apply(samples, simulated_samples, gains, 48000, true);
-
-			// Find basic EQ change
-			auto response = nac::doFFT(simulated_samples, start, stop);
-#if 0
-			filter.apply(samples, simulated_samples, gains, 48000);
 			auto response = fft_output;
-			response = nac::toDecibel(response);
 
-			for (size_t x = 1; x < response.first.size(); x++) {
-				response.second.at(x) += filter.gainAt(response.first.at(x), 48000);
+			if (Base::config().get<bool>("enable_fast_parametric")) {
+				filter.apply(samples, simulated_samples, gains, 48000);
+				response = nac::toDecibel(response);
+
+				for (size_t x = 1; x < response.first.size(); x++) {
+					response.second.at(x) += filter.gainAt(response.first.at(x), 48000);
+				}
+
+				response = nac::toLinear(response);
+			} else {
+				filter.apply(samples, simulated_samples, gains, 48000, true);
+
+				// Find basic EQ change
+				response = nac::doFFT(simulated_samples, start, stop);
 			}
-			response = nac::toLinear(response);
-#endif
+
 			cout << "Transformed to:\n";
 			auto peer = nac::fitBands(response, speaker_eq, false, target_db == 0 ? -20000 : target_db);
 
@@ -608,6 +628,7 @@ namespace nac {
 		cout << "Lower resolution to fit EQ band with size " << eq_frequencies.size() << endl;
 
 		vector<int> mean_band;
+		vector<double> db_vec;
 		double tot = 0;
 		int nums = 0;
 
@@ -625,6 +646,8 @@ namespace nac {
 						energy.at(i) = target_db;
 					else
 						mean_band.push_back(i);
+					cout << "IGNORING Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
+					g_ignore_bands.insert(lround(eq_frequencies.at(i)));
 					continue;
 				}
 				if (low < f_low && high > f_low) {
@@ -633,6 +656,8 @@ namespace nac {
 							energy.at(i) = target_db;
 						else
 							mean_band.push_back(i);
+						cout << "IGNORING Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
+						g_ignore_bands.insert(lround(eq_frequencies.at(i)));
 						continue;
 					}
 					energy.at(i) *= (high - low) / (high - f_low);
@@ -644,6 +669,8 @@ namespace nac {
 							energy.at(i) = target_db;
 						else
 							mean_band.push_back(i);
+						cout << "IGNORING Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
+						g_ignore_bands.insert(lround(eq_frequencies.at(i)));
 						continue;
 					}
 					energy.at(i) *= (high - low) / (f_high - low);
@@ -655,6 +682,7 @@ namespace nac {
 				energy.at(i) = 10 * log10(energy.at(i));
 
 			tot += energy.at(i);
+			db_vec.push_back(energy.at(i));
 			nums++;
 
 			cout << "Frequency\t" << eq_frequencies.at(i) << "\t:\t" << energy.at(i) << endl;
@@ -666,7 +694,7 @@ namespace nac {
 			}
 		}
 
-		auto db_std_dev = calculateSD(energy);
+		auto db_std_dev = calculateSD(db_vec);
 		cout << "db_std_dev " << db_std_dev << endl;
 
 		return { energy, db_std_dev };

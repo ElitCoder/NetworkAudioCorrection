@@ -105,3 +105,7 @@ frequency_range_low: 20
 frequency_range_high: 20000
 # Auto-find speaker range (if not forced with ignore)
 speaker_limitations_factor: 1
+
+## Performance
+# Faster parametric calculation using gainAt() instead of applying
+enable_fast_parametric: 1
