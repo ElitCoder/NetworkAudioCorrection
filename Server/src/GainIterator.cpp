@@ -34,10 +34,20 @@ GainIterator::GainIterator(const vector<FilterNode>& nodes)
 
 static double gainForBand(double band_freq, double freq, double bw, double gain)
 {
-	double lower_limit = band_freq * pow(2, -2 / bw);
-	double upper_limit = band_freq * pow(2, 2 / bw);
+	double bw_change = pow(10, abs(gain) / 20);
+	//double total_change = 4 / bw_change;
+	double total_change = 1.25;
+	double lower_limit = band_freq * pow(2, -total_change / bw);
+	double upper_limit = band_freq * pow(2, total_change / bw);
 
-	//gain = gain * 0.8;
+	if ((freq > 200 && freq < 250) || (freq > 1000 && freq < 1050))
+		cout << "BEFORE upper " << upper_limit << " lower " << lower_limit << " freq " << freq << " band_freq " << band_freq << " gain " << gain << endl;
+
+	if (gain > 5) {
+		gain = sqrt(gain * 4);
+	} else if (gain < -5) {
+		gain = -sqrt(-gain * 4);
+	}
 
 	if ((freq > 200 && freq < 250) || (freq > 1000 && freq < 1050))
 		cout << "upper " << upper_limit << " lower " << lower_limit << " freq " << freq << " band_freq " << band_freq << " gain " << gain << endl;
@@ -62,6 +72,7 @@ static double gainForBand(double band_freq, double freq, double bw, double gain)
 
 double GainIterator::gainAt(double freq)
 {
+#if 1
 	double sum = 0;
 
 	for (auto& node : nodes) {
@@ -74,7 +85,7 @@ double GainIterator::gainAt(double freq)
 		cout << "freq " << freq << " gain " << sum << endl;
 
 	return sum;
-
+#endif
 #if 0
 	if ((nodeLeft == NULL && nodeRight == NULL) || (nodeLeft != NULL && freq < nodeLeft->freq))
 	{

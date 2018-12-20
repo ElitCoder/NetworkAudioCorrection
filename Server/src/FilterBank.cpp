@@ -454,7 +454,7 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 			normalized = filtered;
 		}
 	} else if (type == BANDPASS) {
-#if 0
+#if 1
 		const unsigned int filterLength = 16384;
 		/* Create convolver filter */
 		fftwf_make_planner_thread_safe();
@@ -537,6 +537,7 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 		delete[] inputChannel;
 		delete[] outputChannel;
 #endif
+#if 0
 		/* Apply filters in parallel */
 		vector<vector<double>> out_samples(filters_.size(), vector<double>());
 
@@ -556,6 +557,7 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 				normalized.at(i) += filtered.at(i);
 			}
 		}
+#endif
 	}
 
 	finalizeFiltering(normalized, out);
