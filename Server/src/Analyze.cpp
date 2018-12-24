@@ -273,6 +273,10 @@ namespace nac {
 			Lp -= spl;
 			Lp = -Lp;
 
+			/* SPL to SWL */
+			Lp = pow(10, Lp / 20);
+			Lp = 10 * log10(Lp);
+
 			freqs.push_back(Lp);
 		}
 
