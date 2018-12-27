@@ -1130,15 +1130,21 @@ void writeAPOSettings(const vector<double>& gains) {
 		return;
 	}
 
-	// Write preamp
-	file << "Preamp: 0 dB\n";
-
 	for (size_t i = 0; i < min(frequencies.size(), gains.size()); i++) {
+		if (abs(gains.at(i)) < 1e-3) {
+			continue;
+		}
+
 		file << "Filter: ON PK Fc "
 			<< frequencies.at(i) << " Hz Gain "
 			<< gains.at(i) << " dB Q "
-			<< q
-			<< endl;
+			<< q;
+
+		if (i - 1 == min(frequencies.size(), gains.size())) {
+			continue;
+		}
+
+		cout << endl;
 	}
 
 	file.close();

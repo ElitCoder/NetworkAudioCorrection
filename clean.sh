@@ -5,7 +5,7 @@ cd Client/ && make clean && cd ../
 cd Server/ && make clean && cd ../
 
 # clean test files
-rm -f Server/*.wav Server/eqs
+rm -f Server/*.wav Server/eqs Server/config.txt
 
 # clean libnessh
 rm -rf nessh

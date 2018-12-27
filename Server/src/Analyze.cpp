@@ -255,7 +255,7 @@ namespace nac {
 		return output;
 	}
 
-	FFTOutput applyLoudness(const FFTOutput& input, double spl) {
+	static FFTOutput getLoudness(const FFTOutput& input, double spl) {
 		const double f[] = { 20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500 };
 		const double af[] = { 0.532,0.506,0.480,0.455,0.432,0.409,0.387,0.367,0.349,0.330,0.315,0.301,0.288,0.276,0.267,0.259,0.253,0.250,0.246,0.244,0.243,0.243,0.243,0.242,0.242,0.245,0.254,0.271,0.301 };
 		const double Lu[] = { -31.6,-27.2,-23.0,-19.1,-15.9,-13.0,-10.3,-8.1,-6.2,-4.5,-3.1,-2.0,-1.1,-0.4,0.0,0.3,0.5,0.0,-2.7,-4.1,-1.0,1.7,2.5,1.2,-2.1,-7.1,-11.2,-10.7,-3.1 };
@@ -273,10 +273,7 @@ namespace nac {
 			Lp -= spl;
 			Lp = -Lp;
 
-			/* SPL to SWL */
-			Lp = pow(10, Lp / 20);
-			Lp = 10 * log10(Lp);
-
+			cout << "For SPL " << spl << " and freq " << f[i] << " db " << Lp << endl;
 			freqs.push_back(Lp);
 		}
 
@@ -288,9 +285,23 @@ namespace nac {
 		vector<double> l_freqs(f, f + sizeof(f) / sizeof(double));
 
 		for (size_t i = 0; i < o_freqs.size(); i++)
-			dbs.at(i) += interpolate(l_freqs, freqs, o_freqs.at(i), false);
+			dbs.at(i) = interpolate(l_freqs, freqs, o_freqs.at(i), false);
 
 		return output;
+	}
+
+	FFTOutput applyLoudness(const FFTOutput& input, double monitor_spl, double playback_spl) {
+		auto monitor = getLoudness(input, monitor_spl);
+		auto playback = getLoudness(input, playback_spl);
+
+		/* Resulting loudness curve is playback - monitor */
+		auto resulting = input;
+
+		for (size_t i = 0; i < monitor.first.size(); i++) {
+			resulting.second.at(i) += playback.second.at(i) - monitor.second.at(i);
+		}
+
+		return resulting;
 	}
 
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
@@ -450,8 +461,9 @@ namespace nac {
 			}
 
 			if (loudness) {
-				double spl = Base::config().get<double>("loudness_curve_spl");
-				response = nac::applyLoudness(response, spl);
+				double monitor_spl = Base::config().get<double>("loudness_curve_spl_monitor");
+				double playback_spl = Base::config().get<double>("loudness_curve_spl_playback");
+				response = nac::applyLoudness(response, monitor_spl, playback_spl);
 			}
 
 			if (hardware_profile || shelving_filters || loudness) {
