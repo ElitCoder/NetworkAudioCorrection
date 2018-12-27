@@ -1123,6 +1123,24 @@ void writeAPOSettings(const vector<double>& gains) {
 	auto frequencies = Base::config().getAll<int>("dsp_eq");
 	auto q = Base::config().get<double>("dsp_eq_q");
 
+	ostringstream stream;
+
+	for (size_t i = 0; i < min(frequencies.size(), gains.size()); i++) {
+		if (abs(gains.at(i)) < 1e-3) {
+			continue;
+		}
+
+		stream << "Filter: ON PK Fc "
+			<< frequencies.at(i) << " Hz Gain "
+			<< gains.at(i) << " dB Q "
+			<< q << endl;
+	}
+
+	/* Strip newline at end */
+	string stripped = stream.str();
+	stripped.pop_back();
+
+	/* Write to file */
 	ofstream file("config.txt");
 
 	if (!file.is_open()) {
@@ -1130,23 +1148,7 @@ void writeAPOSettings(const vector<double>& gains) {
 		return;
 	}
 
-	for (size_t i = 0; i < min(frequencies.size(), gains.size()); i++) {
-		if (abs(gains.at(i)) < 1e-3) {
-			continue;
-		}
-
-		file << "Filter: ON PK Fc "
-			<< frequencies.at(i) << " Hz Gain "
-			<< gains.at(i) << " dB Q "
-			<< q;
-
-		if (i - 1 == min(frequencies.size(), gains.size())) {
-			continue;
-		}
-
-		cout << endl;
-	}
-
+	file << stripped;
 	file.close();
 }
 
