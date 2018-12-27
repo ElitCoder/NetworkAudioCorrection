@@ -83,7 +83,7 @@ hardware_profile_cutoff_high_max_freq: 10000
 # Invert for loudness curve?
 hardware_profile_invert: 1
 # Equal loudness contours
-enable_loudness_curve: 1
+enable_loudness_curve: 0
 loudness_curve_spl_monitor: 85
 loudness_curve_spl_playback: 65
 # Basic EQ shelving filters in target curve
@@ -100,8 +100,8 @@ enable_sound_level_adjustment: 0
 # Simulate EQ settings for flat spectrum
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
-simulation_slowdown: 1
-max_simulation_iterations: 20
+simulation_slowdown: 2
+max_simulation_iterations: 40
 # Only attenuate
 boost_max_zero: 0
 # Mean spectrum gain
