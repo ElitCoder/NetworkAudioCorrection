@@ -16,12 +16,12 @@ play_time_freq: 3
 play_time_localization: 1
 validate_white_noise: 1
 ignore_new_eq_settings: 0
-enable_testing: 0
+enable_testing: 1
 # Should we divide with bandwidth?
 is_white_noise: 0
 
 # Write APO settings automatically
-write_apo_settings: 0
+write_apo_settings: 1
 
 # Localization3D (degrees and meters)
 degree_accuracy: 30
@@ -37,10 +37,10 @@ timeout: 120
 # dsp_eq_q - constant Q factor (parametric EQ)
 
 # 9-band EQ (preset dspd)
-dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
-dsp_octave_width: 1
-dsp_eq_q: 1
-dsp_eq_type: parametric
+#dsp_eq: 63 125 250 500 1000 2000 4000 8000 16000
+#dsp_octave_width: 1
+#dsp_eq_q: 1
+#dsp_eq_type: parametric
 
 # 10-band graphic EQ
 #dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
@@ -60,10 +60,10 @@ dsp_eq_type: parametric
 #dsp_eq_type: parametric
 
 # 1/6 octave parametric EQ
-#dsp_eq: 22 25 28 31 35 39 44 50 56 62 70 79 88 99 111 125 140 157 177 198 223 250 281 315 354 397 445 500 561 630 707 794 891 1000 1122 1260 1414 1587 1782 2000 2245 2520 2828 3175 3564 4000 4490 5040 5657 6350 7127 8000 8980 10079 11314 12699 14254 16000 17959
-#dsp_octave_width: 6
-#dsp_eq_q: 5.76
-#dsp_eq_type: parametric
+dsp_eq: 22 25 28 31 35 39 44 50 56 62 70 79 88 99 111 125 140 157 177 198 223 250 281 315 354 397 445 500 561 630 707 794 891 1000 1122 1260 1414 1587 1782 2000 2245 2520 2828 3175 3564 4000 4490 5040 5657 6350 7127 8000 8980 10079 11314 12699 14254 16000 17959
+dsp_octave_width: 6
+dsp_eq_q: 5.76
+dsp_eq_type: parametric
 
 # Test 1/12 graphic EQ
 #dsp_eq: 21 22 23 25 26 28 29 31 33 35 37 39 42 44 47 50 53 56 59 63 66 70 74 79 83 88 94 99 105 111 118 125 132 140 149 157 167 177 187 198 210 223 236 250 265 281 297 315 334 354 375 397 420 445 472 500 530 561 595 630 667 707 749 794 841 891 944 1000 1059 1122 1189 1260 1335 1414 1498 1587 1682 1782 1888 2000 2119 2245 2378 2520 2670 2828 2997 3175 3364 3564 3775 4000 4238 4490 4757 5040 5339 5657 5993 6350 6727 7127 7551 8000 8476 8980 9514 10079 10679 11314 11986 12699 13454 14254 15102 16000 16951 17959 19027
@@ -107,7 +107,7 @@ enable_sound_level_adjustment: 0
 simulate_eq_settings: 1
 # Slowdown simulation to avoid not converging
 simulation_slowdown: 2
-max_simulation_iterations: 40
+max_simulation_iterations: 80
 # Only attenuate
 boost_max_zero: 0
 # Mean spectrum gain
