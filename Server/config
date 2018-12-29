@@ -123,3 +123,21 @@ speaker_limitations_factor: 1
 ## Performance
 # Faster parametric calculation using gainAt() instead of applying
 enable_fast_parametric: 1
+
+## Testing
+enable_custom_eq: 0
+#custom_eq: 0 0 0 10 10 -10 -10 0 0 0
+#custom_eq: 0 0 0 0 0 0 0 0 0 0
+#custom_eq: 0 0 6 6 0 0 -6 -6 0 0
+#custom_eq: 4 0 4 0 4 0 4 0 4 0
+#custom_eq: 0 -2 -4 -6 -8 -10 -8 -6 -4 -2
+#custom_eq: -4 -4 -4 -4 -4 -4 -4 -4 -4 -4
+#custom_eq: -10 -10 -10 -10 -10 -10 -10 -10 -10 -10
+#custom_eq: 4 4 4 4 4 4 4 4 4 4
+#custom_eq: 0 0 0 0 10 -10 0 0 0 0
+#custom_eq: 0 0 4 4 4 4 4 0 0 0
+#custom_eq: 0 0 0 0 4 0 0 0 0 0
+#custom_eq: 0 0 0 0 10 -10 0 0 0 0
+#custom_eq: 0 0 0 6 0 0 -6 0 0 0
+#custom_eq: 0 0 6 6 0 0 -6 -6 0 0
+custom_eq: 0 -10 8 -10 0 10 10 -10 -10 0

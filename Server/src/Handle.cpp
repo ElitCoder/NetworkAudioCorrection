@@ -1667,13 +1667,9 @@ void Handle::testing() {
 #endif
 		vector<pair<int, double>> pair_eq;
 
-		vector<double> test_eq(final_eq.size(), 0);
-		//test_eq = { 0, -10, 8, -10, 0, 10, 10, -10, -10, 0 };
-		//test_eq = { 10, 8, -8, -2, -4, -4, -4, -8, 10, 2 };
-		test_eq.at(2) = -15;
-		//test_eq.at(6) = -10;
-		//test_eq.at(3) = -8;
-		//final_eq = test_eq;
+		if (Base::config().get<bool>("enable_custom_eq")) {
+			final_eq = Base::config().getAll<double>("custom_eq");
+		}
 
 		for (size_t i = 0; i < Base::system().getSpeakerProfile().getSpeakerEQ().first.size(); i++)
 			pair_eq.push_back({ Base::system().getSpeakerProfile().getSpeakerEQ().first.at(i), final_eq.at(i) });
