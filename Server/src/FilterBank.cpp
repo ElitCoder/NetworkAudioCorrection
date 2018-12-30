@@ -576,8 +576,6 @@ double FilterBank::gainAt(double frequency, double fs) {
 		 */
 		double limit = 5.5;
 
-		cout << "USING QUIRK\n";
-
 		if (sum > limit) {
 			sum = sqrt(sum * limit);
 		} else if (sum < -limit) {
