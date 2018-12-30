@@ -157,11 +157,14 @@ static int g_f_high = -1;
 
 namespace nac {
 	FFTOutput doFFT(const vector<short>& samples, size_t start, size_t stop) {
+		size_t max_size = (stop == 0 ? samples.size() : stop);
 		vector<double> in;
+		in.resize(max_size);
 
 		// Normalize to [0, 1]
+		//#pragma omp parallel for
 		for (size_t i = start; i < (stop == 0 ? samples.size() : stop); i++)
-			in.push_back((double)samples.at(i) / (double)SHRT_MAX);
+			in.at(i) = (double)samples.at(i) / (double)SHRT_MAX;
 
 		// Assure FFT bin resolution is higher than the EQ resolution
 		// Fs / N < lowest octave width
@@ -185,12 +188,16 @@ namespace nac {
 		vector<double> output;
 		vector<double> frequencies;
 
+		output.resize(y.size() / 2);
+		frequencies.resize(y.size() / 2);
+
 		// pwelch() output is [0, fs)
+		#pragma omp parallel for
 		for (size_t i = 0; i < y.size() / 2; i++) {
 			double frequency = i * 48000.0 / N;
 
-			frequencies.push_back(frequency);
-			output.push_back(y.at(i));
+			frequencies.at(i) = frequency;
+			output.at(i) = y.at(i);
 		}
 
 		return { frequencies, output };
@@ -419,6 +426,7 @@ namespace nac {
 				filter.apply(samples, simulated_samples, gains, 48000);
 				response = nac::toDecibel(response);
 
+				#pragma omp parallel for
 				for (size_t x = 1; x < response.first.size(); x++) {
 					response.second.at(x) += filter.gainAt(response.first.at(x), 48000);
 				}

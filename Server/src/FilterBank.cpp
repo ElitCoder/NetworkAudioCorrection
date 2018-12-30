@@ -146,9 +146,13 @@ void FilterBank::initializeFiltering(const vector<short>& in, vector<double>& ou
 }
 
 void FilterBank::finalizeFiltering(const vector<double>& in, vector<short>& out) {
+	out.resize(in.size());
+
 	// Convert to linear again
-	for (auto& sample : in)
-		out.push_back(lround(sample * (double)SHRT_MAX));
+	#pragma omp parallel for
+	for (size_t i = 0; i < in.size(); i++) {
+		out.at(i) = lround(in.at(i) * SHRT_MAX);
+	}
 }
 
 // Minimum phase spectrum from coefficients
@@ -326,11 +330,41 @@ void hcPutSingle(HConvSingle *filter, float *x)
 	memcpy(filter->dft_time, x, size);
 	memset(&(filter->dft_time[flen]), 0, size);
 	fftwf_execute(filter->fft);
+	#pragma omp parallel for
 	for (j = 0; j < flen + 1; j++)
 	{
 		filter->in_freq_real[j] = filter->dft_freq[j][0];
 		filter->in_freq_imag[j] = filter->dft_freq[j][1];
 	}
+}
+
+void hcCloseSingle(HConvSingle *filter)
+{
+	int i;
+
+	fftwf_destroy_plan(filter->ifft);
+	fftwf_destroy_plan(filter->fft);
+	fftwf_free(filter->history_time);
+	for (i = 0; i < filter->num_mixbuf; i++)
+	{
+		fftwf_free(filter->mixbuf_freq_real[i]);
+		fftwf_free(filter->mixbuf_freq_imag[i]);
+	}
+	fftwf_free(filter->mixbuf_freq_real);
+	fftwf_free(filter->mixbuf_freq_imag);
+	for (i = 0; i < filter->num_filterbuf; i++)
+	{
+		fftwf_free(filter->filterbuf_freq_real[i]);
+		fftwf_free(filter->filterbuf_freq_imag[i]);
+	}
+	fftwf_free(filter->filterbuf_freq_real);
+	fftwf_free(filter->filterbuf_freq_imag);
+	fftwf_free(filter->in_freq_real);
+	fftwf_free(filter->in_freq_imag);
+	fftwf_free(filter->dft_freq);
+	fftwf_free(filter->dft_time);
+	free(filter->steptask);
+	memset(filter, 0, sizeof(HConvSingle));
 }
 
 void hcInitSingle(HConvSingle *filter, float *h, int hlen, int flen, int steps)
@@ -467,6 +501,7 @@ void FilterBank::applyFilters(vector<double>& normalized, double fs) {
 	fftwf_plan planForward = fftwf_plan_dft_1d(filterLength * 2, timeData, freqData, FFTW_FORWARD, FFTW_ESTIMATE);
 	fftwf_plan planReverse = fftwf_plan_dft_1d(filterLength * 2, freqData, timeData, FFTW_BACKWARD, FFTW_ESTIMATE);
 
+	#pragma omp parallel for
 	for (unsigned i = 0; i < filterLength; i++)
 	{
 		double freq = i * 1.0 * fs / (filterLength * 2);
@@ -483,12 +518,14 @@ void FilterBank::applyFilters(vector<double>& normalized, double fs) {
 
 	fftwf_execute(planReverse);
 
+	#pragma omp parallel for
 	for (unsigned i = 0; i < 2 * filterLength; i++)
 	{
 		timeData[i][0] /= 2 * filterLength;
 		timeData[i][1] /= 2 * filterLength;
 	}
 
+	#pragma omp parallel for
 	for (unsigned i = 0; i < filterLength; i++)
 	{
 		float factor = (float)(0.5 * (1 + cos(2 * M_PI * i * 1.0 / (2 * filterLength))));
@@ -497,6 +534,7 @@ void FilterBank::applyFilters(vector<double>& normalized, double fs) {
 	}
 
 	float* buf = new float[filterLength];
+	#pragma omp parallel for
 	for (unsigned i = 0; i < filterLength; i++)
 	{
 		buf[i] = timeData[i][0];
@@ -533,8 +571,11 @@ void FilterBank::applyFilters(vector<double>& normalized, double fs) {
 		normalized.at(i) = outputChannel[i];
 	}
 
+	/* Cleanup */
 	delete[] inputChannel;
 	delete[] outputChannel;
+
+	hcCloseSingle(filter);
 }
 
 void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, double fs, bool write) {
