@@ -16,10 +16,12 @@ public:
 	void addBand(int frequency, double q, int type);
 	void apply(const std::vector<short>& samples, std::vector<short>& out, const std::vector<std::pair<int, double>>& gains, double fs, bool write = false);
 	double gainAt(double frequency, double fs);
+	bool hasFastMode() const;
 
 private:
 	void initializeFiltering(const std::vector<short>& in, std::vector<double>& out, const std::vector<std::pair<int, double>>& gains, int fs);
 	void finalizeFiltering(const std::vector<double>& in, std::vector<short>& out);
+	void applyFilters(std::vector<double>& normalized, double fs);
 
 	class Filter {
 	public:
@@ -63,7 +65,7 @@ typedef struct str_HConvSingle
 	int num_filterbuf;		// number of filter segments
 	float **filterbuf_freq_real;	// filter segments (frequency domain)
 	float **filterbuf_freq_imag;	// filter segments (frequency domain)
-	int num_mixbuf;			// number of mixing segments		
+	int num_mixbuf;			// number of mixing segments
 	float **mixbuf_freq_real;	// mixing segments (frequency domain)
 	float **mixbuf_freq_imag;	// mixing segments (frequency domain)
 	float *history_time;		// history buffer (time domain)

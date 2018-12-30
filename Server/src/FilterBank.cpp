@@ -1,7 +1,6 @@
 #include "FilterBank.h"
 #include "Base.h"
 #include "Config.h"
-#include "GainIterator.h"
 
 #include <cmath>
 #include <climits>
@@ -18,6 +17,25 @@ FilterBank::Filter::Filter(int frequency, double q, int type) {
 	type_ = type;
 }
 
+static double getFittingQ(double gain, double octave_width) {
+	/* TODO: Calculate linear regression based on octave width. This code just
+	 * assumes that we're working on a 10 band EQ -> octave_width = 1.
+	 */
+	(void)octave_width;
+
+	/* Work on >= 0 */
+	gain = abs(gain);
+
+	/* Linear regression */
+	double bw = -0.25 * gain + 4;
+
+	/* BW to Q */
+	double q = sqrt(pow(2, bw)) / (pow(2, bw) - 1);
+
+	cout << "DEBUG: Return Q " << q << " for gain " << gain << endl;
+	return q;
+}
+
 void FilterBank::Filter::reset(double gain, int fs) {
 	enabled_ = true;
 
@@ -25,6 +43,7 @@ void FilterBank::Filter::reset(double gain, int fs) {
 	double A;
 	double alpha;
 	double a0, a1, a2, b0, b1, b2;
+	double q;
 
 	switch (type_) {
 		case PARAMETRIC:
@@ -33,28 +52,27 @@ void FilterBank::Filter::reset(double gain, int fs) {
 			break;
 
 		case BANDPASS:
-			A = pow(10, gain / 20);
-			alpha = sin(w0) * sinh(M_LN2 / 2 * (1.0 / Base::config().get<double>("dsp_octave_width")) * w0 / sin(w0));
+			/* Implement graphic EQ as parametric with variable Q */
+			A = pow(10, gain / 40);
+			/* Get fitting Q for gain and octave width */
+			q = getFittingQ(gain, Base::config().get<double>("dsp_octave_width"));
+			alpha = sin(w0) / (2 * q);
 			break;
 
 		default: cout << "ERROR: Filter type not specified";
 			return;
 	}
 
-	if (type_ == PARAMETRIC) {
+	if (type_ == PARAMETRIC || type_ == BANDPASS) {
 		a0 = 1 + alpha/A;
 		a1 = -2 * cos(w0);
 		a2 = 1 - alpha / A;
 		b0 = (1 + alpha * A);
 		b1 = -(2 * cos(w0));
 		b2 = (1 - alpha * A);
-	} else if (type_ == BANDPASS) {
-		a0 = 1 + alpha;
-		a1 = -2 * cos(w0);
-		a2 = 1 - alpha;
-		b0 = A * alpha;
-		b1 = 0;
-		b2 = A * -alpha;
+	} else {
+		cout << "ERROR: Can't calculate coeffs for unknown filter type\n";
+		exit(-1);
 	}
 
 	a_.clear();
@@ -430,6 +448,95 @@ void hcInitSingle(HConvSingle *filter, float *h, int hlen, int flen, int steps)
 	}
 }
 
+bool FilterBank::hasFastMode() const {
+	for (auto& filter : filters_) {
+		if (filter.getType() != PARAMETRIC) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void FilterBank::applyFilters(vector<double>& normalized, double fs) {
+	const unsigned int filterLength = 16384;
+	/* Create convolver filter */
+	fftwf_make_planner_thread_safe();
+	fftwf_complex* timeData = fftwf_alloc_complex(filterLength * 2);
+	fftwf_complex* freqData = fftwf_alloc_complex(filterLength * 2);
+	fftwf_plan planForward = fftwf_plan_dft_1d(filterLength * 2, timeData, freqData, FFTW_FORWARD, FFTW_ESTIMATE);
+	fftwf_plan planReverse = fftwf_plan_dft_1d(filterLength * 2, freqData, timeData, FFTW_BACKWARD, FFTW_ESTIMATE);
+
+	for (unsigned i = 0; i < filterLength; i++)
+	{
+		double freq = i * 1.0 * fs / (filterLength * 2);
+		double dbGain = gainAt(freq, fs);
+		float gain = (float)pow(10.0, dbGain / 20.0);
+
+		freqData[i][0] = gain;
+		freqData[i][1] = 0;
+		freqData[2 * filterLength - i - 1][0] = gain;
+		freqData[2 * filterLength - i - 1][1] = 0;
+	}
+
+	mps(timeData, freqData, planForward, planReverse);
+
+	fftwf_execute(planReverse);
+
+	for (unsigned i = 0; i < 2 * filterLength; i++)
+	{
+		timeData[i][0] /= 2 * filterLength;
+		timeData[i][1] /= 2 * filterLength;
+	}
+
+	for (unsigned i = 0; i < filterLength; i++)
+	{
+		float factor = (float)(0.5 * (1 + cos(2 * M_PI * i * 1.0 / (2 * filterLength))));
+		timeData[i][0] *= factor;
+		timeData[i][1] *= factor;
+	}
+
+	float* buf = new float[filterLength];
+	for (unsigned i = 0; i < filterLength; i++)
+	{
+		buf[i] = timeData[i][0];
+	}
+
+	fftwf_free(timeData);
+	fftwf_free(freqData);
+	fftwf_destroy_plan(planForward);
+	fftwf_destroy_plan(planReverse);
+
+	HConvSingle filters;
+
+	/* Process */
+	HConvSingle* filter = &filters;
+	hcInitSingle(filter, buf, filterLength, normalized.size(), 1);
+
+	delete[] buf;
+
+	float* inputChannel = new float[normalized.size()];
+	float* outputChannel = new float[normalized.size()];
+
+	#pragma omp parallel for
+	for (size_t i = 0; i < normalized.size(); i++) {
+		inputChannel[i] = normalized.at(i);
+		outputChannel[i] = 0;
+	}
+
+	hcPutSingle(filter, inputChannel);
+	hcProcessSingle(filter);
+	hcGetSingle(filter, outputChannel);
+
+	#pragma omp parallel for
+	for (size_t i = 0; i < normalized.size(); i++) {
+		normalized.at(i) = outputChannel[i];
+	}
+
+	delete[] inputChannel;
+	delete[] outputChannel;
+}
+
 void FilterBank::apply(const vector<short>& samples, vector<short>& out, const vector<pair<int, double>>& gains, double fs, bool write) {
 	vector<double> normalized;
 	initializeFiltering(samples, normalized, gains, fs);
@@ -441,125 +548,15 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 	out.clear();
 
 	/* All filters are of the same type */
-	if (filters_.empty())
-		cout << "WARNING: Empty filter vector\n";
-
-	auto type = filters_.front().getType();
-
-	if (type == PARAMETRIC) {
-		/* Apply filters in cascade */
-		for (auto& filter : filters_) {
-			vector<double> filtered;
-			filter.process(normalized, filtered);
-			normalized = filtered;
-		}
-	} else if (type == BANDPASS) {
-#if 1
-		const unsigned int filterLength = 16384;
-		/* Create convolver filter */
-		fftwf_make_planner_thread_safe();
-		fftwf_complex* timeData = fftwf_alloc_complex(filterLength * 2);
-		fftwf_complex* freqData = fftwf_alloc_complex(filterLength * 2);
-		fftwf_plan planForward = fftwf_plan_dft_1d(filterLength * 2, timeData, freqData, FFTW_FORWARD, FFTW_ESTIMATE);
-		fftwf_plan planReverse = fftwf_plan_dft_1d(filterLength * 2, freqData, timeData, FFTW_BACKWARD, FFTW_ESTIMATE);
-
-		vector<FilterNode> nodes;
-
-		for (auto& param : gains) {
-			nodes.push_back(FilterNode(param.first, param.second));
-		}
-
-		GainIterator gainIterator(nodes);
-		for (unsigned i = 0; i < filterLength; i++)
-		{
-			double freq = i * 1.0 * fs / (filterLength * 2);
-			double dbGain = gainIterator.gainAt(freq);
-			float gain = (float)pow(10.0, dbGain / 20.0);
-
-			freqData[i][0] = gain;
-			freqData[i][1] = 0;
-			freqData[2 * filterLength - i - 1][0] = gain;
-			freqData[2 * filterLength - i - 1][1] = 0;
-		}
-
-		mps(timeData, freqData, planForward, planReverse);
-
-		fftwf_execute(planReverse);
-
-		for (unsigned i = 0; i < 2 * filterLength; i++)
-		{
-			timeData[i][0] /= 2 * filterLength;
-			timeData[i][1] /= 2 * filterLength;
-		}
-
-		for (unsigned i = 0; i < filterLength; i++)
-		{
-			float factor = (float)(0.5 * (1 + cos(2 * M_PI * i * 1.0 / (2 * filterLength))));
-			timeData[i][0] *= factor;
-			timeData[i][1] *= factor;
-		}
-
-		float* buf = new float[filterLength];
-		for (unsigned i = 0; i < filterLength; i++)
-		{
-			buf[i] = timeData[i][0];
-		}
-
-		fftwf_free(timeData);
-		fftwf_free(freqData);
-		fftwf_destroy_plan(planForward);
-		fftwf_destroy_plan(planReverse);
-
-		HConvSingle filters;
-
-		/* Process */
-		HConvSingle* filter = &filters;
-		hcInitSingle(filter, buf, filterLength, normalized.size(), 1);
-
-		delete[] buf;
-
-		float* inputChannel = new float[normalized.size()];
-		float* outputChannel = new float[normalized.size()];
-
-		for (size_t i = 0; i < normalized.size(); i++) {
-			inputChannel[i] = normalized.at(i);
-			outputChannel[i] = 0;
-		}
-
-		hcPutSingle(filter, inputChannel);
-		hcProcessSingle(filter);
-		hcGetSingle(filter, outputChannel);
-
-		for (size_t i = 0; i < normalized.size(); i++) {
-			normalized.at(i) = outputChannel[i];
-		}
-
-		delete[] inputChannel;
-		delete[] outputChannel;
-#endif
-#if 0
-		/* Apply filters in parallel */
-		vector<vector<double>> out_samples(filters_.size(), vector<double>());
-
-		#pragma omp parallel for
-		for (size_t i = 0; i < filters_.size(); i++) {
-			filters_.at(i).process(normalized, out_samples.at(i));
-		}
-
-		/* Clear normalized */
-		normalized = vector<double>(normalized.size(), 0);
-
-		for (size_t j = 0; j < out_samples.size(); j++) {
-			auto& filtered = out_samples.at(j);
-
-			#pragma omp parallel for
-			for (size_t i = 0; i < normalized.size(); i++) {
-				normalized.at(i) += filtered.at(i);
-			}
-		}
-#endif
+	if (filters_.empty()) {
+		cout << "ERROR: Empty filter vector\n";
+		exit(-1);
 	}
 
+	/* Apply all filters by creating an FIR */
+	applyFilters(normalized, fs);
+
+	/* Copy normalized to out */
 	finalizeFiltering(normalized, out);
 }
 
@@ -569,14 +566,25 @@ double FilterBank::gainAt(double frequency, double fs) {
 	// Sum gainAt() for all filters
 	for (auto& filter : filters_) {
 		double db = filter.gainAt(frequency, fs);
-		//double linear = pow(10, db / 10);
-
-		//cout << "freq " << frequency << " db " << db << endl;
-
 		sum += db;
 	}
 
-	//sum = 10 * log10(sum);
+	if (Base::config().has("quirk_kenwoodge52b") && Base::config().get<bool>("quirk_kenwoodge52b")) {
+		/* The Kenwood GE-52B has some kind of non-linear gain at high
+		 * deviations from flat. Try to mimic this behavior by enabling this
+		 * quirk.
+		 */
+		double limit = 5.5;
+
+		cout << "USING QUIRK\n";
+
+		if (sum > limit) {
+			sum = sqrt(sum * limit);
+		} else if (sum < -limit) {
+			sum = -sqrt(-sum * limit);
+		}
+	}
+
 	return sum;
 }
 

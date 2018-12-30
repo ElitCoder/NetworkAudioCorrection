@@ -42,10 +42,11 @@ timeout: 120
 #dsp_eq_q: 1
 #dsp_eq_type: parametric
 
-# 10-band graphic EQ
+# Kenwood GE-52B 10-band graphic EQ
 #dsp_eq: 32 64 125 250 500 1000 2000 4000 8000 16000
 #dsp_octave_width: 1
 #dsp_eq_type: graphic
+#quirk_kenwoodge52b: 1
 
 # AudioFX 5-band graphic EQ
 #dsp_eq: 60 230 910 4000 14000
