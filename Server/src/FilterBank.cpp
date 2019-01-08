@@ -63,6 +63,11 @@ void FilterBank::Filter::reset(double gain, int fs) {
 			return;
 	}
 
+	if (Base::config().has("quirk_sigmastudio") && Base::config().get<bool>("quirk_sigmastudio")) {
+		/* SigmaStudio implements alpha diffent than the Cookbook */
+		alpha /= A;
+	}
+
 	if (type_ == PARAMETRIC || type_ == BANDPASS) {
 		a0 = 1 + alpha/A;
 		a1 = -2 * cos(w0);
