@@ -108,16 +108,6 @@ static double correctMaxEQ(vector<double>& eq) {
 	return total_mean_change;
 }
 
-static int findBestFFTSize(double fs, double band_width) {
-	// Start number
-	int N = 65536;
-
-	while (fs / (double)N > band_width * 2)
-		N *= 2;
-
-	return N;
-}
-
 /* From SO */
 int RoundToMultiple(double toRound, int multiple)
 {
@@ -162,8 +152,8 @@ namespace nac {
 		in.resize(max_size);
 
 		// Normalize to [0, 1]
-		//#pragma omp parallel for
-		for (size_t i = start; i < (stop == 0 ? samples.size() : stop); i++)
+		#pragma omp parallel for
+		for (size_t i = start; i < max_size; i++)
 			in.at(i) = (double)samples.at(i) / (double)SHRT_MAX;
 
 		// Assure FFT bin resolution is higher than the EQ resolution
@@ -171,15 +161,9 @@ namespace nac {
 		// For example, 63 Hz with 1/1 gives 44 - 88 Hz = 44 Hz width
 
 		auto eq = Base::system().getSpeakerProfile().getSpeakerEQ().first;
-		int N = 8192;
-
-		if (!eq.empty()) {
-			double width = pow(2.0, 1.0 / (2.0 * Base::config().get<double>("dsp_octave_width")));
-			double lower = eq.front() / width;
-			double upper = eq.front() * width;
-
-			N = findBestFFTSize(48000, upper - lower);
-		}
+		// Always use FFT size of 48000 for now, since it gives 1 Hz resolution
+		// 1 Hz resolution assures that adding additional curves applies correctly
+		int N = 65536;
 
 		cout << "Debug: set N to " << N << endl;
 
@@ -516,7 +500,14 @@ namespace nac {
 			}
 
 			if (!best_eq.empty()) {
-				if (best_score < 0.1)
+				auto extra_precision = Base::config().get<bool>("extra_precision");
+				double precision = 0.1;
+
+				if (extra_precision) {
+					precision /= 100;
+				}
+
+				if (best_score < precision)
 					break;
 			}
 

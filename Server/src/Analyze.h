@@ -20,7 +20,7 @@ namespace nac {
 	FFTOutput toLinear(const FFTOutput& input);
 	FFTOutput toDecibel(const FFTOutput& input);
 
-	std::pair<std::vector<double>, double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings, bool input_db, double target_db = -10000);
+	std::pair<std::vector<double>, double> fitBands(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings, bool input_db, double target_db = -20000);
 	std::vector<double> getEQ(const FFTOutput& input, const std::pair<std::vector<double>, double>& eq_settings);
 	std::vector<double> findSimulatedEQSettings(const std::vector<short>& samples, FilterBank filter, size_t start, size_t stop);
 }

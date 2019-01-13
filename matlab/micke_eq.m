@@ -5,8 +5,8 @@ close all
 [x, fsx] = audioread('before.wav');
 [y, fsy] = audioread('after.wav');
 
-sound_start_sec = 3 * fsx;
-sound_stop_sec = 30 * fsx;
+sound_start_sec = 4 * fsx;
+sound_stop_sec = 31 * fsx;
 
 if fsx ~= fsy
     return

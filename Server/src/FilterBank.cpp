@@ -599,8 +599,15 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 		exit(-1);
 	}
 
-	/* Apply all filters by creating an FIR */
-	applyFilters(normalized, fs);
+	/* Apply IIR in cascade */
+	for (auto& filter : filters_) {
+		vector<double> filtered;
+		filter.process(normalized, filtered);
+		normalized = filtered;
+	}
+
+	///* Apply all filters by creating an FIR */
+	//applyFilters(normalized, fs);
 
 	/* Copy normalized to out */
 	finalizeFiltering(normalized, out);

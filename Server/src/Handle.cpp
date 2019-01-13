@@ -1457,25 +1457,12 @@ void Handle::setSoundEffects(const std::vector<std::string> &ips, bool status) {
 	*/
 }
 
-//static vector<double> g_last_eq(9, 0);
-
 static void plotFFT(const vector<short>& samples, size_t start, size_t stop) {
-	if (stop > samples.size())
-		stop = samples.size();
+	//vector<short> real(samples.begin() + start, samples.begin() + stop);
 
-	vector<short> real(samples.begin() + start, samples.begin() + stop);
-
-	auto before = nac::doFFT(real);
+	auto before = nac::doFFT(samples, start, stop);
 	//before = nac::toDecibel(before);
 	auto eq = nac::fitBands(before, Base::system().getSpeakerProfile().getSpeakerEQ(), false).first;
-
-#if 0
-	for (size_t i = 0; i < g_last_eq.size(); i++)
-		cout << eq.at(i) - g_last_eq.at(i) << " ";
-	cout << endl;
-
-	g_last_eq = eq;
-#endif
 }
 
 static vector<short> plotFFTFile(const string& file, size_t& start, size_t& stop, bool plot = true) {
@@ -1483,7 +1470,10 @@ static vector<short> plotFFTFile(const string& file, size_t& start, size_t& stop
 	WavReader::read(file, samples);
 
 	if (stop > samples.size()) {
-		start = 0;
+		// This is usually due to using sweeps instead of noise
+		// TODO: Add sweeps and noise as an actual option
+		cout << "WARNING: Using different start/stop since stop is longer than the file\n";
+		start = 2 * 48000;
 		stop = samples.size();
 	}
 
@@ -1493,143 +1483,10 @@ static vector<short> plotFFTFile(const string& file, size_t& start, size_t& stop
 	return samples;
 }
 
-#if 0
-static vector<double> getSD(const vector<string>& files, size_t start, size_t stop) {
-	vector<double> sds(files.size(), 0.0);
-
-	// Read files and calculate SD
-	#pragma omp parallel for
-	for (size_t i = 0; i < files.size(); i++) {
-		auto& file = files.at(i);
-
-		vector<short> data;
-		WavReader::read(file, data);
-
-		vector<int> ignore;
-
-		if (Base::config().get<bool>("enable_hardware_profile")) {
-			auto index = Base::system().getSpeakerProfile().getFrequencyIndex(Base::system().getSpeakerProfile().getLowCutOff());
-
-			if (index > 0) {
-				while (index > 0)
-					ignore.push_back(--index);
-			}
-		}
-
-		auto response = nac::doFFT(data, start, stop);
-		auto peer = nac::fitBands(response, Base::system().getSpeakerProfile().getSpeakerEQ(), false, ignore);
-
-		sds.at(i) = peer.second.second;
-	}
-
-	return sds;
-}
-#endif
-
-#if 0
-static void testFilter(FFTOutput& fft) {
-	double A = pow(10, 3.0 / 40);
-
-	for (size_t i = 0; i < fft.second.size(); i++) {
-		auto& s = fft.second.at(i);
-		s = (pow(s, 2) + s * (A / 1.0) + 1) / (pow(s, 2) + s / (A  * 1.0) + 1);
-	}
-}
-#endif
-
 void Handle::testing() {
-	#if 0
-	vector<string> speaker_ips = { "1" };
-	vector<string> mic_ips = { "192.168.0.13", "192.168.0.14", "192.168.0.18", "192.168.0.19" };
-
-	int play = Base::config().get<int>("play_time");
-	int idle = Base::config().get<int>("idle_time");
-
-	MicWantedEQ wanted_eqs(mic_ips.size());
-
-	// Go through frequency analysis
-	#pragma omp parallel for
-	for (size_t z = 0; z < mic_ips.size(); z++) {
-		auto& mic_ip = mic_ips.at(z);
-		string filename = "before" + mic_ip + ".wav";
-
-		vector<short> data;
-		WavReader::read(filename, data);
-
-		vector<vector<double>> new_eqs(speaker_ips.size());
-
-		parseSpeakerResponseParallel(mic_ip, speaker_ips, play, idle, data, true, new_eqs);
-
-		// Add this to further calculations when we have all the information
-		wanted_eqs.at(z) = new_eqs;
-	}
-
-	for (size_t i = 0; i < wanted_eqs.size(); i++) {
-		cout << "Setting EQ: ";
-		for (auto& setting : wanted_eqs.at(i).front())
-			cout << setting << " ";
-		cout << endl;
-	}
-
-	return;
-	#endif
-
-	#if 0
-	// Load files and calculate SD
-	system("ls before*.wav > before");
-	system("ls after*.wav > after");
-
-	ifstream before("before");
-	ifstream after("after");
-
-	vector<string> before_files;
-	vector<string> after_files;
-
-	string tmp;
-
-	while (before >> tmp)
-		before_files.push_back(tmp);
-
-	while (after >> tmp)
-		after_files.push_back(tmp);
-
-	before.close();
-	after.close();
-
-	system("rm before after");
-
-	vector<double> before_sd = getSD(before_files, 2 * 48000, 30 * 48000);
-	vector<double> after_sd = getSD(after_files, 2 * 48000, 30 * 48000);
-
-	for (size_t i = 0; i < before_files.size(); i++)
-		cout << before_files.at(i) << " " << before_sd.at(i) << " " << after_sd.at(i) << endl;
-
-	cout << endl;
-
-	return;
-	#endif
-
 	try {
-		#if 0
-		ifstream file("eqs");
-
-		// Ignore number
-		double tmp;
-		file >> tmp;
-
-		vector<pair<int, double>> eq;
-
-		for (int i = 0; i < 9; i++) {
-			file >> tmp;
-
-			eq.push_back({ stoi(g_frequencies.at(i)), tmp });
-		}
-
-		file.close();
-		#endif
-
-		size_t start = lround(3 * 48000.0);
-		size_t stop = lround(30 * 48000.0);
+		size_t start = lround(4 * 48000.0);
+		size_t stop = lround(31 * 48000.0);
 		bool calc_eq = true;
 
 		auto before_samples = plotFFTFile("before.wav", start, stop, false);
