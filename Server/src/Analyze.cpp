@@ -201,46 +201,28 @@ namespace nac {
 	}
 
 	FFTOutput applyShelving(const FFTOutput& input) {
+		const double SHELF_Q = 1 / sqrt(2); // 0.707
 		double low_freq = Base::config().get<double>("low_shelf_freq");
 		double low_gain = Base::config().get<double>("low_shelf_gain");
 		double high_freq = Base::config().get<double>("high_shelf_freq");
 		double high_gain = Base::config().get<double>("high_shelf_gain");
 
-		/* Apply shelving filters as y = kx + m to peak gain */
-		double low_cutoff = low_freq * 0.25;
-		double high_cutoff = high_freq * 4;
+		cout << "Creating shelving with Q " << SHELF_Q << endl;
 
-		/* Add curve to peak */
-		FFTOutput output = input;
+		// Create the actual IIR
+		Filter low_shelf_filter(low_freq, SHELF_Q, LOW_SHELF);
+		Filter high_shelf_filter(high_freq, SHELF_Q, HIGH_SHELF);
+		low_shelf_filter.reset(low_gain, 48000);
+		high_shelf_filter.reset(high_gain, 48000);
+
+		// Ask for gains
+		auto output = input;
 		auto& freqs = output.first;
 		auto& dbs = output.second;
 
 		for (size_t i = 0; i < freqs.size(); i++) {
-			auto& freq = freqs.at(i);
-			auto& db = dbs.at(i);
-
-			if (freq < low_cutoff) {
-				/* If we're below cutoff, apply full gain */
-				db -= low_gain;
-			} else if (freq >= low_cutoff && freq < low_freq) {
-				/* Apply kx + m */
-				double k = low_gain / (low_cutoff - low_freq);
-				double m = -(low_gain / (low_cutoff - low_freq)) * low_freq;
-
-				double y = k * freq + m;
-				db -= y;
-			}
-
-			if (freq > high_cutoff) {
-				db -= high_gain;
-			} else if (freq <= high_cutoff && freq > high_freq) {
-				/* Apply kx + m */
-				double k = high_gain / (high_cutoff - high_freq);
-				double m = -(high_gain / (high_cutoff - high_freq)) * high_freq;
-
-				double y = k * freq + m;
-				db -= y;
-			}
+			dbs.at(i) -= low_shelf_filter.gainAt(freqs.at(i), 48000);
+			dbs.at(i) -= high_shelf_filter.gainAt(freqs.at(i), 48000);
 		}
 
 		return output;

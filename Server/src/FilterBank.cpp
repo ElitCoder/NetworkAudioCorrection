@@ -11,7 +11,7 @@
 
 using namespace std;
 
-FilterBank::Filter::Filter(int frequency, double q, int type) {
+Filter::Filter(int frequency, double q, int type) {
 	frequency_ = frequency;
 	q_ = q;
 	type_ = type;
@@ -36,19 +36,32 @@ static double getFittingQ(double gain, double octave_width) {
 	return q;
 }
 
-void FilterBank::Filter::reset(double gain, int fs) {
+void Filter::reset(double gain, int fs) {
 	enabled_ = true;
 
 	double w0 = 2.0 * M_PI * (double)frequency_ / (double)fs;
 	double A;
 	double alpha;
+	double beta;
 	double a0, a1, a2, b0, b1, b2;
 	double q;
 
+	if (Base::config().has("quirk_kenwoodge52b") && Base::config().get<bool>("quirk_kenwoodge52b")) {
+		/* Kenwood GE-52B doesn't seem to respond to the 2 dB slider */
+		if (abs(gain) <= 2.5) {
+			gain = 0;
+		}
+	}
+
 	switch (type_) {
-		case PARAMETRIC:
+		case PARAMETRIC: case LOW_SHELF: case HIGH_SHELF:
+			// Invert gain due to algorithm
+			if (type_ == LOW_SHELF || type_ == HIGH_SHELF) {
+				gain = -gain;
+			}
 			A = pow(10, gain / 40);
 			alpha = sin(w0) / (2 * q_);
+			beta = sqrt(A) / q_;
 			break;
 
 		case BANDPASS:
@@ -75,6 +88,20 @@ void FilterBank::Filter::reset(double gain, int fs) {
 		b0 = (1 + alpha * A);
 		b1 = -(2 * cos(w0));
 		b2 = (1 - alpha * A);
+	} else if (type_ == LOW_SHELF) {
+		a0 = A * ((A + 1) - (A - 1) * cos(w0) + beta * sin(w0));
+		a1 = 2 * A * ((A -1) - (A + 1) * cos(w0));
+		a2 = A * ((A + 1) - (A - 1) * cos(w0) - beta * sin(w0));
+		b0 = (A + 1) + (A - 1) * cos(w0) + beta * sin(w0);
+		b1 = -2 * ((A - 1) + (A + 1) * cos(w0));
+		b2 = (A + 1) + (A - 1) * cos(w0) - beta * sin(w0);
+	} else if (type_ == HIGH_SHELF) {
+		a0 = A * ((A + 1) + (A - 1) * cos(w0) + beta * sin(w0));
+		a1 = -2 * A * ((A -1) + (A + 1) * cos(w0));
+		a2 = A * ((A + 1) + (A - 1) * cos(w0) - beta * sin(w0));
+		b0 = (A + 1) - (A - 1) * cos(w0) + beta * sin(w0);
+		b1 = 2 * ((A - 1) - (A + 1) * cos(w0));
+		b2 = (A + 1) - (A - 1) * cos(w0) - beta * sin(w0);
 	} else {
 		cout << "ERROR: Can't calculate coeffs for unknown filter type\n";
 		exit(-1);
@@ -90,7 +117,7 @@ void FilterBank::Filter::reset(double gain, int fs) {
 	b_.push_back(a2 / a0);
 }
 
-void FilterBank::Filter::process(const vector<double>& in, vector<double>& out) {
+void Filter::process(const vector<double>& in, vector<double>& out) {
 	if (!enabled_)
 		cout << "Warning: using filter which is not enabled\n";
 
@@ -114,19 +141,19 @@ void FilterBank::Filter::process(const vector<double>& in, vector<double>& out) 
 	}
 }
 
-void FilterBank::Filter::disable() {
+void Filter::disable() {
 	enabled_ = false;
 }
 
-bool FilterBank::Filter::operator==(int frequency) {
+bool Filter::operator==(int frequency) {
 	return frequency == frequency_;
 }
 
-int FilterBank::Filter::getFrequency() const {
+int Filter::getFrequency() const {
 	return frequency_;
 }
 
-int FilterBank::Filter::getType() const {
+int Filter::getType() const {
 	return type_;
 }
 
@@ -488,12 +515,7 @@ void hcInitSingle(HConvSingle *filter, float *h, int hlen, int flen, int steps)
 }
 
 bool FilterBank::hasFastMode() const {
-	for (auto& filter : filters_) {
-		if (filter.getType() != PARAMETRIC) {
-			return false;
-		}
-	}
-
+	// It's always possible for IIR biquads
 	return true;
 }
 
@@ -639,7 +661,7 @@ double FilterBank::gainAt(double frequency, double fs) {
 	return sum;
 }
 
-double FilterBank::Filter::gainAt(double frequency, double fs) {
+double Filter::gainAt(double frequency, double fs) {
 	double omega = 2 * M_PI * frequency / fs;
 	double sn = sin(omega / 2.0);
 	double phi = sn * sn;

@@ -233,6 +233,10 @@ int main() {
 		type = PARAMETRIC;
 	} else if (string_type == "graphic") {
 		type = BANDPASS;
+	} else if (string_type == "low_shelf") {
+		type = LOW_SHELF;
+	} else if (string_type == "high_shelf") {
+		type = HIGH_SHELF;
 	}
 
 	speaker.setSpeakerEQ(frequencies, q);
