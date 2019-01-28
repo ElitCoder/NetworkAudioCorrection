@@ -232,11 +232,17 @@ int main() {
 	if (string_type == "parametric") {
 		type = PARAMETRIC;
 	} else if (string_type == "graphic") {
-		type = BANDPASS;
+		type = GRAPHIC;
 	} else if (string_type == "low_shelf") {
 		type = LOW_SHELF;
 	} else if (string_type == "high_shelf") {
 		type = HIGH_SHELF;
+	} else if (string_type == "low_pass") {
+		type = LOW_PASS;
+	} else if (string_type == "high_pass") {
+		type = HIGH_PASS;
+	} else if (string_type == "band_pass") {
+		type = BAND_PASS;
 	}
 
 	speaker.setSpeakerEQ(frequencies, q);

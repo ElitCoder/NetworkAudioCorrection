@@ -8,9 +8,12 @@
 
 enum {
 	PARAMETRIC,
-	BANDPASS,
+	GRAPHIC,
 	LOW_SHELF,
-	HIGH_SHELF
+	HIGH_SHELF,
+	LOW_PASS,
+	HIGH_PASS,
+	BAND_PASS
 };
 
 class Filter {

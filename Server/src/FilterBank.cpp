@@ -54,7 +54,7 @@ void Filter::reset(double gain, int fs) {
 	}
 
 	switch (type_) {
-		case PARAMETRIC: case LOW_SHELF: case HIGH_SHELF:
+		case PARAMETRIC: case LOW_SHELF: case HIGH_SHELF: case LOW_PASS: case HIGH_PASS:
 			// Invert gain due to algorithm
 			if (type_ == LOW_SHELF || type_ == HIGH_SHELF) {
 				gain = -gain;
@@ -64,12 +64,16 @@ void Filter::reset(double gain, int fs) {
 			beta = sqrt(A) / q_;
 			break;
 
-		case BANDPASS:
+		case GRAPHIC:
 			/* Implement graphic EQ as parametric with variable Q */
 			A = pow(10, gain / 40);
 			/* Get fitting Q for gain and octave width */
 			q = getFittingQ(gain, Base::config().get<double>("dsp_octave_width"));
 			alpha = sin(w0) / (2 * q);
+			break;
+
+		case BAND_PASS:
+			alpha = sin(w0) * sinh((log(2) / 2.0) * (1.0 / Base::config().get<double>("dsp_octave_width")) * w0 / sin(w0));
 			break;
 
 		default: cout << "ERROR: Filter type not specified";
@@ -81,7 +85,7 @@ void Filter::reset(double gain, int fs) {
 		alpha /= A;
 	}
 
-	if (type_ == PARAMETRIC || type_ == BANDPASS) {
+	if (type_ == PARAMETRIC || type_ == GRAPHIC) {
 		a0 = 1 + alpha/A;
 		a1 = -2 * cos(w0);
 		a2 = 1 - alpha / A;
@@ -102,6 +106,27 @@ void Filter::reset(double gain, int fs) {
 		b0 = (A + 1) - (A - 1) * cos(w0) + beta * sin(w0);
 		b1 = 2 * ((A - 1) - (A + 1) * cos(w0));
 		b2 = (A + 1) - (A - 1) * cos(w0) - beta * sin(w0);
+	} else if (type_ == BAND_PASS) {
+		a0 = 1 + alpha;
+		a1 = -2 * cos(w0);
+		a2 = 1 - alpha;
+		b0 = alpha;
+		b1 = 0;
+		b2 = -alpha;
+	} else if (type_ == LOW_PASS) {
+		a0 = 1 + alpha;
+		a1 = -2 * cos(w0);
+		a2 = 1 - alpha;
+		b0 = (1 - cos(w0)) / 2;
+		b1 = 1 - cos(w0);
+		b2 = (1 - cos(w0)) / 2;
+	} else if (type_ == HIGH_PASS) {
+		a0 = 1 + alpha;
+		a1 = -2 * cos(w0);
+		a2 = 1 - alpha;
+		b0 = (1 + cos(w0)) / 2;
+		b1 = -(1 + cos(w0));
+		b2 = (1 + cos(w0)) / 2;
 	} else {
 		cout << "ERROR: Can't calculate coeffs for unknown filter type\n";
 		exit(-1);
