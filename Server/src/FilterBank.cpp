@@ -653,6 +653,21 @@ void FilterBank::apply(const vector<short>& samples, vector<short>& out, const v
 		normalized = filtered;
 	}
 
+	// Print highest peak
+	double peak = INT_MIN;
+	double peak_freq;
+
+	for (int i = 0; i < 20000; i++) {
+		auto gain = gainAt(i, fs);
+
+		if (gain > peak) {
+			peak = gain;
+			peak_freq = i;
+		}
+	}
+
+	cout << "Highest filter peak is at " << peak_freq << " with gain " << peak << endl;
+
 	///* Apply all filters by creating an FIR */
 	//applyFilters(normalized, fs);
 

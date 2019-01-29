@@ -456,7 +456,15 @@ namespace nac {
 
 			/* Set target_db to mean if it's the first run */
 			if (i == 0/* || Base::config().get<bool>("boost_max_zero")*/) {
-				target_db = mean(negative_curve);
+				double sum_target = 0;
+				int num_target = 0;
+				for (size_t i = 0; i < negative_curve.size(); i++) {
+					if (speaker_eq_frequencies.at(i) > 500 && speaker_eq_frequencies.at(i) < 2000) {
+						sum_target += negative_curve.at(i);
+						num_target++;
+					}
+				}
+				target_db = sum_target / num_target;//mean(negative_curve);
 				cout << "Setting target DB to " << target_db << endl;
 			}
 
