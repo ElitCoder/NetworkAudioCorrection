@@ -102,7 +102,7 @@ loudness_curve_spl_monitor: 75
 loudness_curve_spl_playback: 65
 # Basic EQ shelving filters in target curve
 enable_shelving_filters: 0
-low_shelf_freq: 200
+low_shelf_freq: 150
 low_shelf_gain: 6
 high_shelf_freq: 4000
 high_shelf_gain: 4
