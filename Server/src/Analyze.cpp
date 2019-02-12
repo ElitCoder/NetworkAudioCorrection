@@ -277,6 +277,42 @@ namespace nac {
 		return resulting;
 	}
 
+	FFTOutput applyHC(const FFTOutput& input) {
+		// TODO: Fix this. Currently we're just blindly adjusting to 10 dB tilt
+#if 0
+		// TODO: Parse this outside of this file
+		auto name = Base::config().get<string>("hc_file");
+		ifstream file(name);
+		if (!file.is_open()) {
+			cout << "WARNING: Could not open house curve file\n";
+			return input;
+		}
+
+		string frequency;
+		string gain;
+		vector<pair<double, double>> points;
+		while (!file.eof()) {
+			getline(file, frequency);
+			getline(file, gain);
+			points.push_back({ stod(frequency), stod(gain) });
+		}
+#endif
+
+		auto output = input;
+		auto& freqs = output.first;
+		auto& dbs = output.second;
+
+		double k = (-5 - 5) / (log10(20000) - log10(20));
+		double m = 5 - k * log10(20);
+
+		for (size_t i = 0; i < freqs.size(); i++) {
+			double y = k * log10(freqs.at(i)) + m;
+			dbs.at(i) -= y;
+		}
+
+		return output;
+	}
+
 	FFTOutput applyProfiles(const FFTOutput& input, const Profile& speaker_profile, const Profile& microphone_profile) {
 		auto low = max(speaker_profile.getLowCutOff(), microphone_profile.getLowCutOff());
 		auto high = min(speaker_profile.getHighCutOff(), microphone_profile.getHighCutOff());
@@ -411,8 +447,9 @@ namespace nac {
 			bool hardware_profile = Base::config().get<bool>("enable_hardware_profile");
 			bool shelving_filters = Base::config().get<bool>("enable_shelving_filters");
 			bool loudness = Base::config().get<bool>("enable_loudness_curve");
+			bool house_curve = Base::config().get<bool>("enable_house_curve");
 
-			if (hardware_profile || shelving_filters || loudness) {
+			if (hardware_profile || shelving_filters || loudness || house_curve) {
 				/* Convert to dB */
 				response = nac::toDecibel(response);
 			}
@@ -440,7 +477,11 @@ namespace nac {
 				response = nac::applyLoudness(response, monitor_spl, playback_spl);
 			}
 
-			if (hardware_profile || shelving_filters || loudness) {
+			if (house_curve) {
+				response = nac::applyHC(response);
+			}
+
+			if (hardware_profile || shelving_filters || loudness || house_curve) {
 				/* Convert back to linear */
 				response = nac::toLinear(response);
 

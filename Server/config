@@ -102,10 +102,13 @@ loudness_curve_spl_monitor: 75
 loudness_curve_spl_playback: 65
 # Basic EQ shelving filters in target curve
 enable_shelving_filters: 0
-low_shelf_freq: 150
+low_shelf_freq: 120
 low_shelf_gain: 6
-high_shelf_freq: 4000
-high_shelf_gain: 4
+high_shelf_freq: 8000
+high_shelf_gain: 6
+# House curve
+enable_house_curve: 1
+house_curve_file: data/hc_tilt5.txt
 # Which level the DSP will set when testing white noise
 calibration_safe_gain: 0
 # Ignore top bands for setting DSP max limit, i.e everything above this frequency won't affect lowering the DSP gain, 0 disables
