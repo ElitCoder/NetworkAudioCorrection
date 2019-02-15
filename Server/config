@@ -107,7 +107,7 @@ low_shelf_gain: 6
 high_shelf_freq: 8000
 high_shelf_gain: 6
 # House curve
-enable_house_curve: 1
+enable_house_curve: 0
 house_curve_file: data/hc_tilt5.txt
 # Which level the DSP will set when testing white noise
 calibration_safe_gain: 0
@@ -132,6 +132,8 @@ frequency_range_high: 20000
 speaker_limitations_factor: 1
 # Use extra precision (0.001 instead of 0.1)
 extra_precision: 1
+# Print frequency response to file
+print_freq_response: 1
 
 ## Performance
 # Faster parametric calculation using gainAt() instead of applying

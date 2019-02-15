@@ -424,6 +424,32 @@ namespace nac {
 			vector<short> simulated_samples;
 			auto response = fft_output;
 
+			if (Base::config().get<bool>("print_freq_response")) {
+				// Only print once
+				if (i == 0) {
+					// Normalize power spectrum if we're using pink noise
+					auto print_freq = response;
+					for (size_t j = 0; j < print_freq.first.size(); j++) {
+						print_freq.second.at(j) *= print_freq.first.at(j);
+					}
+
+					// Power -> dB
+					print_freq = nac::toDecibel(print_freq);
+
+					// Write to file
+					ofstream file("freq_response.txt");
+					for (size_t j = 0; j < print_freq.first.size(); j++) {
+						// Only include [20, 20000]
+						if (print_freq.first.at(j) < 20 || print_freq.first.at(j) > 20000) {
+							continue;
+						}
+
+						file << print_freq.first.at(j) << ", " << print_freq.second.at(j) << endl;
+					}
+					file.close();
+				}
+			}
+
 			if (Base::config().get<bool>("enable_fast_parametric")) {
 				filter.apply(samples, simulated_samples, gains, 48000);
 				response = nac::toDecibel(response);
