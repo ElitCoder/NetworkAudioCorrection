@@ -427,10 +427,13 @@ namespace nac {
 			if (Base::config().get<bool>("print_freq_response")) {
 				// Only print once
 				if (i == 0) {
-					// Normalize power spectrum if we're using pink noise
 					auto print_freq = response;
-					for (size_t j = 0; j < print_freq.first.size(); j++) {
-						print_freq.second.at(j) *= print_freq.first.at(j);
+
+					// Normalize power spectrum if we're using pink noise
+					if (!Base::config().get<bool>("is_white_noise")) {
+						for (size_t j = 0; j < print_freq.first.size(); j++) {
+							print_freq.second.at(j) *= print_freq.first.at(j);
+						}
 					}
 
 					// Power -> dB
